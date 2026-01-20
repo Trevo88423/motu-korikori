@@ -1,0 +1,29 @@
+# Wrangler configuration for Cloudflare Worker
+# See: https://developers.cloudflare.com/workers/wrangler/configuration/
+
+name = "motu-dictionary-audio-upload"
+main = "audio-upload.js"
+compatibility_date = "2024-01-01"
+
+# R2 Bucket Binding
+[[r2_buckets]]
+binding = "R2_BUCKET"
+bucket_name = "motu-dictionary-audio"  # Change this to your actual bucket name
+
+# Environment Variables
+# Set these using: wrangler secret put <NAME>
+# Or in the Cloudflare dashboard under Workers > Settings > Variables
+
+# Required secrets (set via wrangler secret put):
+# - SUPABASE_JWT_SECRET
+# - SUPABASE_URL
+# - SUPABASE_ANON_KEY
+
+[vars]
+# Public URL for R2 bucket (custom domain or R2.dev subdomain)
+R2_PUBLIC_URL = "https://audio.your-domain.com"  # Change this
+ALLOWED_ORIGIN = "https://your-nextjs-app.vercel.app"  # Change this
+
+# Development settings
+[env.development]
+vars = { R2_PUBLIC_URL = "http://localhost:8787", ALLOWED_ORIGIN = "http://localhost:3000" }

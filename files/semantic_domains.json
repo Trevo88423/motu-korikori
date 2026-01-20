@@ -1,0 +1,19 @@
+{
+  "body": "Body parts, physical states, health",
+  "food": "Food, drink, eating, cooking",
+  "nature": "Animals, plants, weather, landscape",
+  "family": "Kinship terms, relationships",
+  "house": "Home, buildings, furniture",
+  "tools": "Tools, implements, technology",
+  "clothing": "Clothes, adornments",
+  "time": "Time expressions, seasons, calendar",
+  "number": "Numbers, quantities",
+  "action": "Common verbs, actions",
+  "emotion": "Feelings, states of mind",
+  "religion": "Religious/spiritual terms",
+  "social": "Social interactions, community",
+  "color": "Colors, visual descriptions",
+  "direction": "Directions, locations",
+  "question": "Question words",
+  "grammar": "Grammatical particles, connectors"
+}
