@@ -25,6 +25,23 @@ export default async function WordDetailPage({
     notFound()
   }
 
+  // Get previous and next words (by frequency for logical ordering)
+  const { data: prevWord } = await supabase
+    .from('words')
+    .select('id, motu_word')
+    .lt('frequency', word.frequency)
+    .order('frequency', { ascending: false })
+    .limit(1)
+    .single()
+
+  const { data: nextWord } = await supabase
+    .from('words')
+    .select('id, motu_word')
+    .gt('frequency', word.frequency)
+    .order('frequency', { ascending: true })
+    .limit(1)
+    .single()
+
   // Fetch all contributions with profile info
   const { data: contributions } = await supabase
     .from('contributions')
@@ -80,10 +97,31 @@ export default async function WordDetailPage({
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="mb-6">
+      <div className="mb-6 flex items-center justify-between">
         <Link href="/dictionary" className="text-primary-600 hover:underline text-sm">
           ← Back to Dictionary
         </Link>
+
+        <div className="flex items-center gap-2">
+          {prevWord && (
+            <Link
+              href={`/dictionary/${prevWord.id}`}
+              className="btn btn-ghost text-sm"
+              title={`Previous: ${prevWord.motu_word}`}
+            >
+              ← Prev
+            </Link>
+          )}
+          {nextWord && (
+            <Link
+              href={`/dictionary/${nextWord.id}`}
+              className="btn btn-ghost text-sm"
+              title={`Next: ${nextWord.motu_word}`}
+            >
+              Next →
+            </Link>
+          )}
+        </div>
       </div>
 
       <div className="card">
@@ -231,11 +269,18 @@ export default async function WordDetailPage({
         {(!contributions || contributions.length === 0) && (
           <div className="text-center py-8 text-gray-500">
             <p>No contributions yet for this word.</p>
-            <Link href="/contribute" className="btn btn-primary mt-4">
+            <Link href={`/contribute?word=${word.id}`} className="btn btn-primary mt-4">
               Be the First to Contribute
             </Link>
           </div>
         )}
+
+        {/* Contribute Button - always show */}
+        <div className="border-t mt-8 pt-6 text-center">
+          <Link href={`/contribute?word=${word.id}`} className="btn btn-primary">
+            ➕ Add Your Translation
+          </Link>
+        </div>
       </div>
     </div>
   )

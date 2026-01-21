@@ -117,9 +117,16 @@ export default function AudioRecorder({ onRecordingComplete, onAudioUrlChange }:
               <button
                 type="button"
                 onClick={reset}
-                className="px-3 py-2 text-sm text-red-600 hover:text-red-700 transition"
+                className="px-3 py-2 text-sm bg-red-50 text-red-600 hover:bg-red-100 rounded-md transition"
               >
                 Re-record
+              </button>
+              <button
+                type="button"
+                onClick={reset}
+                className="px-3 py-2 text-sm text-gray-600 hover:text-gray-800 transition"
+              >
+                Delete
               </button>
             </>
           )}

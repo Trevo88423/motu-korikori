@@ -1,12 +1,21 @@
 import { redirect } from 'next/navigation'
 import { createServerComponentClient, getCurrentUserProfile } from '@/lib/supabase'
-import WordCard from '@/components/WordCard'
+import ContributeClient from '@/components/ContributeClient'
 import { saveContribution } from './actions'
 import type { Word, Contribution, ContributionWithProfile } from '@/lib/types'
 
 export const dynamic = 'force-dynamic'
 
-export default async function ContributePage() {
+interface SearchParams {
+  word?: string
+}
+
+export default async function ContributePage({
+  searchParams,
+}: {
+  searchParams: Promise<SearchParams>
+}) {
+  const params = await searchParams
   const supabase = await createServerComponentClient()
   const profile = await getCurrentUserProfile()
 
@@ -28,9 +37,26 @@ export default async function ContributePage() {
     )
   }
 
-  // Get next word for user using the database function
-  const { data: words, error: wordsError } = await supabase
-    .rpc('get_next_word_for_user', { user_uuid: profile.id })
+  // Get next word for user - either specific word or next in sequence
+  let words
+  let wordsError
+
+  if (params.word) {
+    // Get specific word by ID
+    const result = await supabase
+      .from('words')
+      .select('*')
+      .eq('id', params.word)
+      .single()
+    words = result.data ? [result.data] : null
+    wordsError = result.error
+  } else {
+    // Get next word for user using the database function
+    const result = await supabase
+      .rpc('get_next_word_for_user', { user_uuid: profile.id })
+    words = result.data
+    wordsError = result.error
+  }
 
   if (wordsError) {
     console.error('Error fetching next word:', wordsError)
@@ -104,7 +130,7 @@ export default async function ContributePage() {
         </div>
       </div>
 
-      <WordCard
+      <ContributeClient
         word={word}
         userContribution={userContribution as Contribution}
         allContributions={(allContributions || []) as ContributionWithProfile[]}

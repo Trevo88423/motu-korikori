@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import type { Word, Contribution, ContributionFormData, ContributionWithProfile, ContributionGroup } from '@/lib/types'
 import ConsensusBar from './ConsensusBar'
 import AudioRecorder from './AudioRecorder'
@@ -10,15 +10,25 @@ interface WordCardProps {
   userContribution?: Contribution
   allContributions: ContributionWithProfile[]
   onSubmit: (data: ContributionFormData) => Promise<void>
+  onSkip?: () => void
 }
 
-export default function WordCard({ word, userContribution, allContributions, onSubmit }: WordCardProps) {
+export default function WordCard({ word, userContribution, allContributions, onSubmit, onSkip }: WordCardProps) {
   const [englishGloss, setEnglishGloss] = useState(userContribution?.english_gloss || '')
   const [audioUrl, setAudioUrl] = useState<string | null>(userContribution?.audio_url || null)
   const [confidence, setConfidence] = useState(userContribution?.confidence || 'certain')
   const [notes, setNotes] = useState(userContribution?.notes || '')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+
+  // Reset form when word changes
+  useEffect(() => {
+    setEnglishGloss(userContribution?.english_gloss || '')
+    setAudioUrl(userContribution?.audio_url || null)
+    setConfidence(userContribution?.confidence || 'certain')
+    setNotes(userContribution?.notes || '')
+    setError('')
+  }, [word.id, userContribution])
 
   // Group contributions for consensus display
   const contributionGroups: ContributionGroup[] = []
@@ -167,6 +177,7 @@ export default function WordCard({ word, userContribution, allContributions, onS
           <div>
             <label className="label">Audio Pronunciation (optional)</label>
             <AudioRecorder
+              key={word.id} // Force remount when word changes
               onRecordingComplete={(blob) => {
                 // Will be uploaded on submit
                 console.log('Recording complete:', blob)
@@ -219,13 +230,26 @@ export default function WordCard({ word, userContribution, allContributions, onS
             </div>
           )}
 
-          <button
-            type="submit"
-            className="btn btn-primary w-full text-lg py-3"
-            disabled={loading}
-          >
-            {loading ? 'Saving...' : userContribution ? 'Update & Next' : 'Save & Next'}
-          </button>
+          <div className="flex gap-3">
+            {onSkip && !userContribution && (
+              <button
+                type="button"
+                onClick={onSkip}
+                className="btn btn-ghost flex-1 text-lg py-3"
+                disabled={loading}
+              >
+                Skip for Now
+              </button>
+            )}
+
+            <button
+              type="submit"
+              className={`btn btn-primary text-lg py-3 ${onSkip && !userContribution ? 'flex-1' : 'w-full'}`}
+              disabled={loading}
+            >
+              {loading ? 'Saving...' : userContribution ? 'Update & Next' : 'Save & Next'}
+            </button>
+          </div>
         </form>
 
         {/* Show existing contributions */}
