@@ -2,6 +2,7 @@ import { createServerComponentClient } from '@/lib/supabase'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import ConsensusBar from '@/components/ConsensusBar'
+import CommentSection from '@/components/CommentSection'
 import type { Word, ContributionWithProfile, ContributionGroup } from '@/lib/types'
 
 export const dynamic = 'force-dynamic'
@@ -42,6 +43,9 @@ export default async function WordDetailPage({
     .limit(1)
     .single()
 
+  // Get current user
+  const { data: { user } } = await supabase.auth.getUser()
+
   // Fetch all contributions with profile info
   const { data: contributions } = await supabase
     .from('contributions')
@@ -51,6 +55,35 @@ export default async function WordDetailPage({
     `)
     .eq('word_id', id)
     .order('created_at', { ascending: false })
+
+  // Fetch comments for this word
+  const { data: comments } = await supabase
+    .from('comments')
+    .select(`
+      *,
+      profile:profiles(name, connection_type, trust_score)
+    `)
+    .eq('word_id', id)
+    .order('net_votes', { ascending: false })
+
+  // Get user's vote on each comment
+  const commentsWithVotes = comments ? await Promise.all(
+    comments.map(async (comment) => {
+      if (!user) return { ...comment, user_vote: null }
+
+      const { data: vote } = await supabase
+        .from('comment_votes')
+        .select('vote_type')
+        .eq('comment_id', comment.id)
+        .eq('user_id', user.id)
+        .single()
+
+      return { ...comment, user_vote: vote?.vote_type || null }
+    })
+  ) : []
+
+  // Find user's own comment
+  const userComment = commentsWithVotes.find(c => c.user_id === user?.id)
 
   // Group contributions for consensus display
   const contributionGroups: ContributionGroup[] = []
@@ -274,6 +307,16 @@ export default async function WordDetailPage({
             </Link>
           </div>
         )}
+
+        {/* Community Comments & Context */}
+        <div className="border-t mt-8 pt-8">
+          <CommentSection
+            wordId={word.id}
+            comments={commentsWithVotes}
+            userComment={userComment}
+            currentUserId={user?.id}
+          />
+        </div>
 
         {/* Contribute Button - always show */}
         <div className="border-t mt-8 pt-6 text-center">

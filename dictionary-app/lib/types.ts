@@ -89,8 +89,39 @@ export interface Contribution {
   notes: string | null;
   is_excluded: boolean;
   matches_consensus: boolean | null;
+  upvote_count: number;
+  net_votes: number;
   created_at: string;
   updated_at: string;
+}
+
+export interface Comment {
+  id: string;
+  word_id: string;
+  user_id: string;
+  comment_text: string;
+  is_flagged: boolean;
+  flag_count: number;
+  upvote_count: number;
+  downvote_count: number;
+  net_votes: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CommentVote {
+  id: string;
+  comment_id: string;
+  user_id: string;
+  vote_type: 1 | -1; // 1 = upvote, -1 = downvote
+  created_at: string;
+}
+
+export interface ContributionVote {
+  id: string;
+  contribution_id: string;
+  user_id: string;
+  created_at: string;
 }
 
 export interface ModerationLog {
@@ -110,6 +141,11 @@ export interface WordWithContributions extends Word {
 
 export interface ContributionWithProfile extends Contribution {
   profile?: Pick<Profile, 'name' | 'connection_type' | 'trust_score'>;
+}
+
+export interface CommentWithProfile extends Comment {
+  profile?: Pick<Profile, 'name' | 'connection_type' | 'trust_score'>;
+  user_vote?: 1 | -1 | null; // Current user's vote on this comment
 }
 
 export interface ProfileStats {
@@ -145,8 +181,18 @@ export interface ContributionFormData {
   word_id: string;
   english_gloss: string;
   audio_url?: string;
-  confidence: ConfidenceLevel;
-  notes?: string;
+  confidence: ConfidenceLevel; // Keep for now during migration
+  notes?: string; // Keep for now during migration
+}
+
+export interface CommentFormData {
+  word_id: string;
+  comment_text: string;
+}
+
+export interface VoteAction {
+  target_id: string; // contribution_id or comment_id
+  vote_type?: 1 | -1; // For comments: 1 = upvote, -1 = downvote
 }
 
 // Consensus calculation types
