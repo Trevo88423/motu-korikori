@@ -64,23 +64,47 @@ export default async function DictionaryPage({
     console.error('Error fetching words:', error)
   }
 
+  // Fetch top comments for displayed words
+  const wordIds = words?.map(w => w.id) || []
+  let topCommentsByWordId = new Map<string, { comment_text: string; net_votes: number; connection_type: string }>()
+
+  if (wordIds.length > 0) {
+    const { data: comments } = await supabase
+      .from('comments')
+      .select('word_id, comment_text, net_votes, profile:profiles(connection_type)')
+      .in('word_id', wordIds)
+      .gte('net_votes', 0)
+      .order('net_votes', { ascending: false })
+
+    // Group by word_id and take the top one for each
+    comments?.forEach(comment => {
+      if (!topCommentsByWordId.has(comment.word_id)) {
+        topCommentsByWordId.set(comment.word_id, {
+          comment_text: comment.comment_text,
+          net_votes: comment.net_votes,
+          connection_type: (comment.profile as any)?.connection_type || 'other'
+        })
+      }
+    })
+  }
+
   const totalPages = count ? Math.ceil(count / perPage) : 0
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">True Motu Dictionary</h1>
-        <p className="text-gray-600">
+      <div className="mb-6 sm:mb-8">
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">True Motu Dictionary</h1>
+        <p className="text-sm sm:text-base text-gray-600">
           Browse all {count?.toLocaleString() || '15,610'} words in the dictionary
         </p>
       </div>
 
       {/* Alphabet Filter */}
-      <div className="card mb-4">
-        <div className="flex flex-wrap gap-2">
+      <div className="card mb-4 overflow-x-auto">
+        <div className="flex flex-wrap gap-1 sm:gap-2">
           <Link
             href={`/dictionary?search=${search}&englishSearch=${englishSearch}&status=${status}`}
-            className={`px-3 py-1 rounded transition ${
+            className={`px-2 sm:px-3 py-1 text-sm rounded transition ${
               !letter ? 'bg-primary-600 text-white' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
             }`}
           >
@@ -90,7 +114,7 @@ export default async function DictionaryPage({
             <Link
               key={l}
               href={`/dictionary?search=${search}&englishSearch=${englishSearch}&letter=${l}&status=${status}`}
-              className={`px-3 py-1 rounded transition ${
+              className={`px-2 sm:px-3 py-1 text-sm rounded transition ${
                 letter === l ? 'bg-primary-600 text-white' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
               }`}
             >
@@ -163,53 +187,61 @@ export default async function DictionaryPage({
       {words && words.length > 0 ? (
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {words.map((word: Word) => (
-              <div key={word.id} className="card hover:shadow-lg transition-shadow relative">
-                <Link href={`/dictionary/${word.id}`} className="block">
-                  <div className="flex items-start justify-between mb-2">
-                    <h3 className="text-xl font-bold text-primary-900">
-                      {word.motu_word}
-                    </h3>
-                    <span className={`px-2 py-1 text-xs font-medium rounded ${
-                      word.status === 'verified' ? 'bg-green-100 text-green-700' :
-                      word.status === 'consensus' ? 'bg-blue-100 text-blue-700' :
-                      word.status === 'flagged' ? 'bg-yellow-100 text-yellow-700' :
-                      'bg-gray-100 text-gray-700'
-                    }`}>
-                      {word.status}
-                    </span>
-                  </div>
+            {words.map((word: Word) => {
+              const topComment = topCommentsByWordId.get(word.id)
+              return (
+                <div key={word.id} className="card hover:shadow-lg transition-shadow relative">
+                  <Link href={`/dictionary/${word.id}`} className="block">
+                    <div className="flex items-start justify-between mb-2">
+                      <h3 className="text-xl font-bold text-primary-900">
+                        {word.motu_word}
+                      </h3>
+                      <span className={`px-2 py-1 text-xs font-medium rounded ${
+                        word.status === 'verified' ? 'bg-green-100 text-green-700' :
+                        word.status === 'consensus' ? 'bg-blue-100 text-blue-700' :
+                        word.status === 'flagged' ? 'bg-yellow-100 text-yellow-700' :
+                        'bg-gray-100 text-gray-700'
+                      }`}>
+                        {word.status}
+                      </span>
+                    </div>
 
-                  {word.consensus_gloss && (
-                    <p className="text-gray-700 mb-2">
-                      {word.consensus_gloss}
-                    </p>
-                  )}
+                    {word.consensus_gloss && (
+                      <p className="text-gray-700 mb-2">
+                        {word.consensus_gloss}
+                      </p>
+                    )}
 
-                  <div className="flex items-center space-x-4 text-xs text-gray-500">
-                    <span>Frequency: {word.frequency.toLocaleString()}</span>
-                    <span>
-                      {word.total_contributions} {word.total_contributions === 1 ? 'contribution' : 'contributions'}
-                    </span>
-                  </div>
+                    <div className="flex items-center space-x-4 text-xs text-gray-500">
+                      <span>Frequency: {word.frequency.toLocaleString()}</span>
+                      <span>
+                        {word.total_contributions} {word.total_contributions === 1 ? 'contribution' : 'contributions'}
+                      </span>
+                    </div>
 
-                  {word.example_reference && (
-                    <p className="text-xs text-gray-500 mt-2 truncate">
-                      Example: {word.example_reference}
-                    </p>
-                  )}
-                </Link>
-
-                <div className="mt-3 pt-3 border-t">
-                  <Link
-                    href={`/contribute?word=${word.id}`}
-                    className="text-sm text-primary-600 hover:text-primary-800 font-medium"
-                  >
-                    ➕ Contribute Translation
+                    {topComment && (
+                      <div className="mt-3 pt-2 border-t border-gray-100">
+                        <p className="text-sm text-gray-600 line-clamp-2">
+                          💬 {topComment.comment_text}
+                        </p>
+                        {topComment.net_votes > 0 && (
+                          <span className="text-xs text-green-600">▲ {topComment.net_votes}</span>
+                        )}
+                      </div>
+                    )}
                   </Link>
+
+                  <div className="mt-3 pt-3 border-t">
+                    <Link
+                      href={`/contribute?word=${word.id}`}
+                      className="text-sm text-primary-600 hover:text-primary-800 font-medium"
+                    >
+                      ➕ Contribute Translation
+                    </Link>
+                  </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
 
           {/* Pagination */}

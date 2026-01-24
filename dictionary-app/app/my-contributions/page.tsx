@@ -32,6 +32,12 @@ export default async function MyContributionsPage() {
     .eq('user_id', profile.id)
     .order('created_at', { ascending: false })
 
+  // Create a map of word_id -> comment for easy lookup
+  const commentsByWordId = new Map<string, any>()
+  comments?.forEach(comment => {
+    commentsByWordId.set(comment.word_id, comment)
+  })
+
   // Calculate stats
   const fullContributions = contributions?.filter(c => c.agreement_type === 'full').length || 0
   const agreements = contributions?.filter(c => c.agreement_type === 'agree').length || 0
@@ -106,48 +112,62 @@ export default async function MyContributionsPage() {
 
         {contributions && contributions.length > 0 ? (
           <div className="space-y-3">
-            {contributions.slice(0, 20).map((contribution: any) => (
-              <div
-                key={contribution.id}
-                className="flex flex-col sm:flex-row sm:items-start sm:justify-between p-3 sm:p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition gap-2"
-              >
-                <div className="flex-1 min-w-0">
-                  <div className="flex flex-wrap items-center gap-1 sm:gap-2 mb-1">
-                    <span className="font-medium text-base sm:text-lg text-primary-900">
-                      {contribution.word?.motu_word}
-                    </span>
-                    <span className="text-gray-400">→</span>
-                    <span className="text-gray-900 text-sm sm:text-base break-words">{contribution.english_gloss}</span>
+            {contributions.slice(0, 20).map((contribution: any) => {
+              const comment = commentsByWordId.get(contribution.word_id)
+              return (
+                <div
+                  key={contribution.id}
+                  className="p-3 sm:p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      <span className="font-medium text-base sm:text-lg text-primary-900">
+                        {contribution.word?.motu_word}
+                      </span>
+                      <span className="text-gray-400 mx-1">→</span>
+                      <span className="text-gray-900 text-sm sm:text-base">{contribution.english_gloss}</span>
+                    </div>
+                    {contribution.word?.consensus_gloss === contribution.english_gloss && (
+                      <span className="text-green-600 font-medium text-xs whitespace-nowrap">
+                        ✓ Consensus
+                      </span>
+                    )}
                   </div>
-                  <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs text-gray-500">
-                    <span>
-                      {new Date(contribution.created_at).toLocaleDateString()}
-                    </span>
-                    <span className={`px-2 py-0.5 rounded ${
+                  <div className="flex items-center gap-2 mt-1 text-xs text-gray-500">
+                    <span>{new Date(contribution.created_at).toLocaleDateString()}</span>
+                    <span>•</span>
+                    <span className={`px-1.5 py-0.5 rounded ${
                       contribution.agreement_type === 'full'
                         ? 'bg-green-100 text-green-700'
                         : 'bg-blue-100 text-blue-700'
                     }`}>
-                      {contribution.agreement_type === 'full' ? 'Full' : 'Agreement'}
+                      {contribution.agreement_type === 'full' ? 'Full' : 'Agree'}
                     </span>
                     {contribution.audio_url && (
-                      <span className="px-2 py-0.5 rounded bg-purple-100 text-purple-700">
-                        🎤 Audio
-                      </span>
+                      <>
+                        <span>•</span>
+                        <span className="text-purple-600">🎤</span>
+                      </>
                     )}
+                    <span>•</span>
                     <span className="capitalize">{contribution.confidence.replace('_', ' ')}</span>
                   </div>
-                  {contribution.notes && (
-                    <p className="text-sm text-gray-600 mt-2">{contribution.notes}</p>
+                  {comment && (
+                    <div className="mt-2 pt-2 border-t border-gray-200">
+                      <div className="flex items-center gap-2 text-xs text-gray-500 mb-1">
+                        <span className="font-medium text-gray-600">Your comment</span>
+                        {comment.net_votes !== 0 && (
+                          <span className={comment.net_votes > 0 ? 'text-green-600' : 'text-red-600'}>
+                            {comment.net_votes > 0 ? '▲' : '▼'} {Math.abs(comment.net_votes)}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-sm text-gray-700">{comment.comment_text}</p>
+                    </div>
                   )}
                 </div>
-                {contribution.word?.consensus_gloss === contribution.english_gloss && (
-                  <span className="sm:ml-4 text-green-600 font-medium text-xs sm:text-sm self-start sm:self-auto">
-                    ✓ Consensus
-                  </span>
-                )}
-              </div>
-            ))}
+              )
+            })}
           </div>
         ) : (
           <div className="text-center py-12 text-gray-500">
@@ -158,36 +178,6 @@ export default async function MyContributionsPage() {
           </div>
         )}
       </div>
-
-      {/* Recent Comments */}
-      {comments && comments.length > 0 && (
-        <div className="card">
-          <h3 className="text-xl font-bold text-gray-900 mb-4">Recent Comments</h3>
-          <div className="space-y-3">
-            {comments.slice(0, 10).map((comment: any) => (
-              <div
-                key={comment.id}
-                className="p-4 bg-gray-50 rounded-lg"
-              >
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="font-medium text-primary-900">
-                    {comment.word?.motu_word}
-                  </span>
-                  <span className="text-xs text-gray-500">
-                    {new Date(comment.created_at).toLocaleDateString()}
-                  </span>
-                  {comment.net_votes > 0 && (
-                    <span className="text-xs text-green-600">
-                      ▲ {comment.net_votes}
-                    </span>
-                  )}
-                </div>
-                <p className="text-gray-700">{comment.comment_text}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
       {/* Quick Actions */}
       <div className="mt-6 sm:mt-8 flex flex-col sm:flex-row justify-center gap-3 sm:gap-4">
