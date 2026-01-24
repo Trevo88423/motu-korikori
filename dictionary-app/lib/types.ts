@@ -91,6 +91,7 @@ export interface Contribution {
   matches_consensus: boolean | null;
   upvote_count: number;
   net_votes: number;
+  agreement_type: 'full' | 'agree'; // full = complete contribution, agree = lightweight agreement
   created_at: string;
   updated_at: string;
 }
@@ -198,13 +199,17 @@ export interface VoteAction {
 // Consensus calculation types
 export interface ContributionGroup {
   gloss: string;
-  count: number;
+  count: number; // Total contributors
+  full_count: number; // Full contributions
+  agree_count: number; // Agreement clicks
   weighted_count: number;
   contributors: {
     connection_type: ConnectionType;
     trust_score: number;
+    agreement_type: 'full' | 'agree';
   }[];
-  audio_urls: string[];
+  audio_urls: { url: string; user_id: string }[]; // Track which user uploaded each audio
+  user_agreed?: boolean; // Whether current user agreed with this
 }
 
 export interface ConsensusResult {

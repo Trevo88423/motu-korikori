@@ -36,6 +36,15 @@ export async function createServerComponentClient() {
           }
         },
       },
+      db: {
+        schema: 'public',
+      },
+      global: {
+        // Disable all caching for Supabase queries
+        headers: {
+          'cache-control': 'no-store, no-cache, must-revalidate, max-age=0',
+        },
+      },
     }
   )
 }

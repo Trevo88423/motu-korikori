@@ -1,13 +1,18 @@
 'use client'
 
+import { useState } from 'react'
 import type { ContributionGroup } from '@/lib/types'
 
 interface ConsensusBarProps {
   contributions: ContributionGroup[]
   currentConsensus: string | null
+  wordId?: string
+  onAgree?: (gloss: string) => Promise<void>
+  currentUserId?: string
 }
 
-export default function ConsensusBar({ contributions, currentConsensus }: ConsensusBarProps) {
+export default function ConsensusBar({ contributions, currentConsensus, wordId, onAgree, currentUserId }: ConsensusBarProps) {
+  const [agreeLoading, setAgreeLoading] = useState<string | null>(null)
   if (contributions.length === 0) {
     return (
       <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
@@ -54,7 +59,7 @@ export default function ConsensusBar({ contributions, currentConsensus }: Consen
 
           return (
             <div key={index} className="space-y-1">
-              <div className="flex items-center justify-between text-sm">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between text-sm mb-1 gap-1">
                 <div className="flex items-center space-x-2">
                   <span className={`font-medium ${isConsensus ? 'text-green-700' : 'text-gray-900'}`}>
                     {group.gloss}
@@ -66,7 +71,7 @@ export default function ConsensusBar({ contributions, currentConsensus }: Consen
                   )}
                 </div>
                 <div className="text-gray-500 text-xs space-x-2">
-                  <span>{group.count} {group.count === 1 ? 'contributor' : 'contributors'}</span>
+                  <span>{group.full_count} full{group.agree_count > 0 ? ` • ${group.agree_count} agree` : ''}</span>
                   <span className="font-medium">{percentage.toFixed(1)}%</span>
                 </div>
               </div>
@@ -84,42 +89,117 @@ export default function ConsensusBar({ contributions, currentConsensus }: Consen
                 />
               </div>
 
-              {/* Contributors breakdown */}
-              {group.contributors.length > 0 && (
-                <div className="flex flex-wrap gap-1 mt-1">
+              {/* Audio recordings */}
+              {group.audio_urls.length > 0 && (
+                <div className="mt-2 space-y-2">
                   {(() => {
-                    const nativeSpeakers = group.contributors.filter(c => c.connection_type === 'native_speaker').length
-                    const heritageSpeakers = group.contributors.filter(c => c.connection_type === 'heritage_speaker').length
-                    const secondLanguage = group.contributors.filter(c => c.connection_type === 'second_language').length
-                    const others = group.contributors.length - nativeSpeakers - heritageSpeakers - secondLanguage
+                    const userAudio = group.audio_urls.filter(a => a.user_id === currentUserId)
+                    const communityAudio = group.audio_urls.filter(a => a.user_id !== currentUserId)
 
                     return (
                       <>
-                        {nativeSpeakers > 0 && (
-                          <span className="text-xs px-2 py-0.5 bg-primary-100 text-primary-700 rounded">
-                            {nativeSpeakers} native
-                          </span>
+                        {/* User's own audio - shown separately */}
+                        {userAudio.length > 0 && (
+                          <div className="bg-green-50 border border-green-200 rounded-md p-2">
+                            <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                              <span className="text-xs font-medium text-green-700 flex-shrink-0">Your Audio:</span>
+                              {userAudio.map((audio, idx) => (
+                                <audio key={idx} controls className="h-8 w-full sm:w-auto">
+                                  <source src={audio.url} type="audio/webm" />
+                                  <source src={audio.url} type="audio/mp4" />
+                                  Your browser does not support audio playback.
+                                </audio>
+                              ))}
+                            </div>
+                          </div>
                         )}
-                        {heritageSpeakers > 0 && (
-                          <span className="text-xs px-2 py-0.5 bg-purple-100 text-purple-700 rounded">
-                            {heritageSpeakers} heritage
-                          </span>
-                        )}
-                        {secondLanguage > 0 && (
-                          <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded">
-                            {secondLanguage} L2
-                          </span>
-                        )}
-                        {others > 0 && (
-                          <span className="text-xs px-2 py-0.5 bg-gray-100 text-gray-700 rounded">
-                            {others} other
-                          </span>
+
+                        {/* Community audio */}
+                        {communityAudio.length > 0 && (
+                          <div className="space-y-2">
+                            <span className="text-xs text-gray-600 block">Community Audio:</span>
+                            <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2">
+                              {communityAudio.slice(0, 3).map((audio, audioIndex) => (
+                                <audio key={audioIndex} controls className="h-8 w-full sm:w-auto">
+                                  <source src={audio.url} type="audio/webm" />
+                                  <source src={audio.url} type="audio/mp4" />
+                                  Your browser does not support audio playback.
+                                </audio>
+                              ))}
+                              {communityAudio.length > 3 && (
+                                <span className="text-xs text-gray-500 self-center">
+                                  +{communityAudio.length - 3} more
+                                </span>
+                              )}
+                            </div>
+                          </div>
                         )}
                       </>
                     )
                   })()}
                 </div>
               )}
+
+              {/* Contributors breakdown + Agree button */}
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mt-2 gap-2">
+                {group.contributors.length > 0 && (
+                  <div className="flex flex-wrap gap-1">
+                    {(() => {
+                      const nativeSpeakers = group.contributors.filter(c => c.connection_type === 'native_speaker').length
+                      const heritageSpeakers = group.contributors.filter(c => c.connection_type === 'heritage_speaker').length
+                      const secondLanguage = group.contributors.filter(c => c.connection_type === 'second_language').length
+                      const others = group.contributors.length - nativeSpeakers - heritageSpeakers - secondLanguage
+
+                      return (
+                        <>
+                          {nativeSpeakers > 0 && (
+                            <span className="text-xs px-2 py-0.5 bg-primary-100 text-primary-700 rounded">
+                              {nativeSpeakers} native
+                            </span>
+                          )}
+                          {heritageSpeakers > 0 && (
+                            <span className="text-xs px-2 py-0.5 bg-purple-100 text-purple-700 rounded">
+                              {heritageSpeakers} heritage
+                            </span>
+                          )}
+                          {secondLanguage > 0 && (
+                            <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded">
+                              {secondLanguage} L2
+                            </span>
+                          )}
+                          {others > 0 && (
+                            <span className="text-xs px-2 py-0.5 bg-gray-100 text-gray-700 rounded">
+                              {others} other
+                            </span>
+                          )}
+                        </>
+                      )
+                    })()}
+                  </div>
+                )}
+
+                {/* Agree button - only show if user authenticated and has onAgree handler */}
+                {currentUserId && onAgree && (
+                  <button
+                    onClick={async () => {
+                      setAgreeLoading(group.gloss)
+                      try {
+                        await onAgree(group.gloss)
+                      } finally {
+                        setAgreeLoading(null)
+                      }
+                    }}
+                    disabled={agreeLoading === group.gloss}
+                    className={`text-xs px-3 py-1 rounded transition ${
+                      group.user_agreed
+                        ? 'bg-green-100 text-green-700 border border-green-300 hover:bg-green-200'
+                        : 'bg-gray-100 text-gray-700 border border-gray-300 hover:bg-gray-200'
+                    }`}
+                  >
+                    {agreeLoading === group.gloss ? '...' : group.user_agreed ? '✓ Agreed' : 'I Agree'}
+                  </button>
+                )}
+              </div>
             </div>
           )
         })}

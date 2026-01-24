@@ -7,11 +7,17 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "seed:generate": "ts-node supabase/seed-words.ts"
+    "seed:generate": "ts-node supabase/seed-words.ts",
+    "seed:load": "ts-node supabase/load-seed.ts",
+    "suggestions:generate": "ts-node scripts/generate-suggestions.ts",
+    "suggestions:improved": "ts-node scripts/generate-suggestions-improved.ts",
+    "suggestions:all": "ts-node scripts/generate-all-suggestions.ts"
   },
   "dependencies": {
-    "@supabase/ssr": "^0.1.0",
+    "@anthropic-ai/sdk": "^0.71.2",
+    "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.39.7",
+    "dotenv": "^17.2.3",
     "next": "^15.1.3",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
@@ -23,6 +29,7 @@
     "autoprefixer": "^10.4.17",
     "eslint": "^8.56.0",
     "eslint-config-next": "14.1.0",
+    "pg": "^8.17.2",
     "postcss": "^8.4.35",
     "tailwindcss": "^3.4.1",
     "ts-node": "^10.9.2",

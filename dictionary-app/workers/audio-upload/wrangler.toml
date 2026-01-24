@@ -1,0 +1,11 @@
+name = "motu-audio-upload"
+main = "src/index.ts"
+compatibility_date = "2024-01-01"
+
+# R2 bucket binding
+[[r2_buckets]]
+binding = "AUDIO_BUCKET"
+bucket_name = "motu-dictionary-audio"
+
+[vars]
+ALLOWED_ORIGINS = "http://localhost:3000,https://your-production-domain.com"

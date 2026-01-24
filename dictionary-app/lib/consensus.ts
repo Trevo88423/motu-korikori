@@ -14,6 +14,7 @@ interface ContributionData {
   audio_url: string | null
   is_excluded: boolean
   user_id: string
+  agreement_type: 'full' | 'agree'
   profile: {
     connection_type: ConnectionType
     trust_score: number
@@ -68,14 +69,17 @@ function groupContributions(contributions: ContributionData[]): ContributionGrou
     groups.push({
       gloss,
       count: contribs.length,
+      full_count: contribs.filter((c) => c.agreement_type === 'full').length,
+      agree_count: contribs.filter((c) => c.agreement_type === 'agree').length,
       weighted_count: weightedCount,
       contributors: contribs.map((c) => ({
         connection_type: c.profile.connection_type,
         trust_score: c.profile.trust_score,
+        agreement_type: c.agreement_type,
       })),
       audio_urls: contribs
-        .map((c) => c.audio_url)
-        .filter((url): url is string => url !== null),
+        .filter((c) => c.audio_url !== null)
+        .map((c) => ({ url: c.audio_url!, user_id: c.user_id })),
     })
   })
 

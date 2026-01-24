@@ -51,10 +51,10 @@ export async function addComment(data: CommentFormData) {
   }
 
   revalidatePath('/dictionary/[id]', 'page')
-  revalidatePath('/contribute')
+  revalidatePath(`/contribute?word=${data.word_id}`, 'page')
 }
 
-export async function updateComment(commentId: string, commentText: string) {
+export async function updateComment(commentId: string, commentText: string, wordId?: string) {
   const supabase = await createServerComponentClient()
 
   // Get current user
@@ -82,10 +82,12 @@ export async function updateComment(commentId: string, commentText: string) {
   }
 
   revalidatePath('/dictionary/[id]', 'page')
-  revalidatePath('/contribute')
+  if (wordId) {
+    revalidatePath(`/contribute?word=${wordId}`, 'page')
+  }
 }
 
-export async function deleteComment(commentId: string) {
+export async function deleteComment(commentId: string, wordId?: string) {
   const supabase = await createServerComponentClient()
 
   // Get current user
@@ -107,10 +109,12 @@ export async function deleteComment(commentId: string) {
   }
 
   revalidatePath('/dictionary/[id]', 'page')
-  revalidatePath('/contribute')
+  if (wordId) {
+    revalidatePath(`/contribute?word=${wordId}`, 'page')
+  }
 }
 
-export async function flagComment(commentId: string) {
+export async function flagComment(commentId: string, wordId?: string) {
   const supabase = await createServerComponentClient()
 
   // Get current user
@@ -130,14 +134,16 @@ export async function flagComment(commentId: string) {
   }
 
   revalidatePath('/dictionary/[id]', 'page')
-  revalidatePath('/contribute')
+  if (wordId) {
+    revalidatePath(`/contribute?word=${wordId}`, 'page')
+  }
 }
 
 // ============================================================================
 // VOTING ACTIONS
 // ============================================================================
 
-export async function voteOnComment(action: VoteAction) {
+export async function voteOnComment(action: VoteAction, wordId?: string) {
   const supabase = await createServerComponentClient()
 
   // Get current user
@@ -203,10 +209,12 @@ export async function voteOnComment(action: VoteAction) {
   await updateTrustScoreForVote(user.id, action.vote_type, 'comment')
 
   revalidatePath('/dictionary/[id]', 'page')
-  revalidatePath('/contribute')
+  if (wordId) {
+    revalidatePath(`/contribute?word=${wordId}`, 'page')
+  }
 }
 
-export async function voteOnContribution(contributionId: string) {
+export async function voteOnContribution(contributionId: string, wordId?: string) {
   const supabase = await createServerComponentClient()
 
   // Get current user
@@ -274,7 +282,9 @@ export async function voteOnContribution(contributionId: string) {
   }
 
   revalidatePath('/dictionary/[id]', 'page')
-  revalidatePath('/contribute')
+  if (wordId) {
+    revalidatePath(`/contribute?word=${wordId}`, 'page')
+  }
 }
 
 // ============================================================================
@@ -298,14 +308,15 @@ async function updateTrustScoreForVote(
   if (!voter) return
 
   // Calculate vote weight based on connection type and trust score
-  const typeWeight = {
+  const typeWeights: Record<string, number> = {
     native_speaker: 2.0,
     heritage_speaker: 1.5,
     second_language: 1.0,
     learning_now: 0.5,
     researcher: 1.0,
     other: 0.5,
-  }[voter.connection_type] || 1.0
+  }
+  const typeWeight = typeWeights[voter.connection_type as string] || 1.0
 
   const trustMultiplier = voter.trust_score >= 1.0 ? 1.0 :
                          voter.trust_score >= 0.5 ? 0.75 :

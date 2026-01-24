@@ -1,17 +1,18 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import SignupForm from '@/components/SignupForm'
 import ConsentForm from '@/components/ConsentForm'
 import { createClientComponentClient } from '@/lib/supabase-client'
+import { createUserProfile } from './actions'
 import type { SignupFormData, AgeRange, ConnectionType } from '@/lib/types'
 
 export const dynamic = 'force-dynamic'
 
 export default function SignupPage() {
   const router = useRouter()
-  const supabase = createClientComponentClient()
+  const supabase = useMemo(() => createClientComponentClient(), [])
 
   const [step, setStep] = useState(1)
   const [loading, setLoading] = useState(false)
@@ -32,6 +33,7 @@ export default function SignupPage() {
     is_18_or_older: false,
     guardian_name: '',
     guardian_email: '',
+    guardian_consent: false,
   })
 
   const handleChange = (field: string, value: any) => {
@@ -120,10 +122,13 @@ export default function SignupPage() {
     setLoading(true)
 
     try {
-      // 1. Sign up the user
+      // 1. Sign up the user with email verification
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
+        options: {
+          emailRedirectTo: `${window.location.origin}/auth/callback?type=signup`,
+        },
       })
 
       if (authError) throw authError
@@ -132,29 +137,30 @@ export default function SignupPage() {
         throw new Error('User creation failed')
       }
 
-      // 2. Create profile with extended data
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .insert({
-          id: authData.user.id,
-          email: formData.email,
-          name: formData.name,
-          age_range: formData.age_range,
-          locations: formData.locations,
-          connection_type: formData.connection_type,
-          who_taught: formData.who_taught || null,
-          consent_tos: formData.consent_tos,
-          consent_dictionary: formData.consent_dictionary,
-          consent_ai_training: formData.consent_ai_training,
-          is_18_or_older: formData.is_18_or_older,
-          guardian_name: formData.guardian_name || null,
-          guardian_email: formData.guardian_email || null,
-        })
+      // 2. Create profile with extended data using Server Action
+      const profileResult = await createUserProfile({
+        userId: authData.user.id,
+        email: formData.email,
+        name: formData.name,
+        age_range: formData.age_range,
+        locations: formData.locations,
+        connection_type: formData.connection_type,
+        who_taught: formData.who_taught || '',
+        consent_tos: formData.consent_tos,
+        consent_dictionary: formData.consent_dictionary,
+        consent_ai_training: formData.consent_ai_training,
+        is_18_or_older: formData.is_18_or_older,
+        guardian_name: formData.guardian_name,
+        guardian_email: formData.guardian_email,
+        guardian_consent: formData.guardian_consent,
+      })
 
-      if (profileError) throw profileError
+      if (!profileResult.success) {
+        throw new Error(profileResult.error || 'Failed to create profile')
+      }
 
-      // Success! Redirect to contribute page
-      router.push('/contribute')
+      // Success! Redirect to verify email page
+      router.push(`/verify-email?email=${encodeURIComponent(formData.email)}`)
 
     } catch (error: any) {
       console.error('Signup error:', error)
@@ -169,8 +175,8 @@ export default function SignupPage() {
   return (
     <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
       <div className="card">
-        <h1 className="text-3xl font-bold text-center mb-2">Join the True Motu Dictionary</h1>
-        <p className="text-gray-600 text-center mb-8">
+        <h1 className="text-2xl sm:text-3xl font-bold text-center mb-2">Join the True Motu Dictionary</h1>
+        <p className="text-sm sm:text-base text-gray-600 text-center mb-6 sm:mb-8">
           Help preserve Motu korikori for future generations
         </p>
 
@@ -200,11 +206,11 @@ export default function SignupPage() {
                 errors={errors}
               />
 
-              <div className="mt-8 flex justify-end">
+              <div className="mt-6 sm:mt-8 flex justify-end">
                 <button
                   type="button"
                   onClick={handleNext}
-                  className="btn btn-primary"
+                  className="btn btn-primary w-full sm:w-auto"
                 >
                   Next: Consent & Permissions
                 </button>
@@ -231,7 +237,7 @@ export default function SignupPage() {
                 </div>
               )}
 
-              <div className="mt-8 flex justify-between">
+              <div className="mt-6 sm:mt-8 flex flex-col-reverse sm:flex-row sm:justify-between gap-3">
                 <button
                   type="button"
                   onClick={handleBack}

@@ -2,20 +2,26 @@
 
 import { useRouter } from 'next/navigation'
 import WordCard from './WordCard'
-import type { Word, Contribution, ContributionFormData, ContributionWithProfile } from '@/lib/types'
+import type { Word, Contribution, ContributionFormData, ContributionWithProfile, CommentWithProfile } from '@/lib/types'
 
 interface ContributeClientProps {
   word: Word
   userContribution?: Contribution
   allContributions: ContributionWithProfile[]
+  comments: CommentWithProfile[]
+  currentUserId: string
   onSubmit: (data: ContributionFormData) => Promise<void>
+  onComplete: (wordId: string) => Promise<void>
 }
 
 export default function ContributeClient({
   word,
   userContribution,
   allContributions,
-  onSubmit
+  comments,
+  currentUserId,
+  onSubmit,
+  onComplete
 }: ContributeClientProps) {
   const router = useRouter()
 
@@ -27,7 +33,15 @@ export default function ContributeClient({
 
   const handleSubmit = async (data: ContributionFormData) => {
     await onSubmit(data)
-    // Navigate to next word after successful submission
+    // Stay on the same word after saving - let user add comments
+    // They can use the bottom buttons to navigate when ready
+    router.push(`/contribute?word=${word.id}`)
+    router.refresh()
+  }
+
+  const handleComplete = async () => {
+    await onComplete(word.id)
+    // Navigate to next word after marking complete
     router.push('/contribute')
     router.refresh()
   }
@@ -37,8 +51,11 @@ export default function ContributeClient({
       word={word}
       userContribution={userContribution}
       allContributions={allContributions}
+      comments={comments}
+      currentUserId={currentUserId}
       onSubmit={handleSubmit}
       onSkip={handleSkip}
+      onComplete={handleComplete}
     />
   )
 }

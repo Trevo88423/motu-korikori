@@ -2,9 +2,11 @@ import { redirect } from 'next/navigation'
 import { createServerComponentClient, getCurrentUserProfile } from '@/lib/supabase'
 import ContributeClient from '@/components/ContributeClient'
 import { saveContribution } from './actions'
+import { markWordComplete } from './completion-actions'
 import type { Word, Contribution, ContributionWithProfile } from '@/lib/types'
 
 export const dynamic = 'force-dynamic'
+export const revalidate = 0 // Disable caching completely
 
 interface SearchParams {
   word?: string
@@ -94,13 +96,19 @@ export default async function ContributePage({
 
   const word = words[0] as Word
 
+  // IMPORTANT: Disable caching for these queries to ensure fresh data after deletion
+  const timestamp = new Date().getTime()
+
   // Check if user already contributed to this word
+  // Use maybeSingle() to handle case where contribution was deleted
   const { data: userContribution } = await supabase
     .from('contributions')
     .select('*')
     .eq('word_id', word.id)
     .eq('user_id', profile.id)
-    .single()
+    .maybeSingle()
+
+  console.log(`[${timestamp}] Fetched userContribution:`, userContribution)
 
   // Get all contributions for this word (for consensus display)
   const { data: allContributions } = await supabase
@@ -111,6 +119,30 @@ export default async function ContributePage({
     `)
     .eq('word_id', word.id)
     .order('created_at', { ascending: false })
+
+  // Get comments for this word
+  const { data: comments } = await supabase
+    .from('comments')
+    .select(`
+      *,
+      profile:profiles(name, connection_type, trust_score)
+    `)
+    .eq('word_id', word.id)
+    .order('net_votes', { ascending: false })
+
+  // Get user's vote on each comment
+  const commentsWithVotes = comments ? await Promise.all(
+    comments.map(async (comment) => {
+      const { data: vote } = await supabase
+        .from('comment_votes')
+        .select('vote_type')
+        .eq('comment_id', comment.id)
+        .eq('user_id', profile.id)
+        .single()
+
+      return { ...comment, user_vote: vote?.vote_type || null }
+    })
+  ) : []
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -134,7 +166,10 @@ export default async function ContributePage({
         word={word}
         userContribution={userContribution as Contribution}
         allContributions={(allContributions || []) as ContributionWithProfile[]}
+        comments={commentsWithVotes}
+        currentUserId={profile.id}
         onSubmit={saveContribution}
+        onComplete={markWordComplete}
       />
     </div>
   )

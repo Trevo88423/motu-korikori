@@ -17,6 +17,7 @@ export default function CommentSection({ wordId, comments, userComment, currentU
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [showLowScored, setShowLowScored] = useState(false)
+  const [showGuidelines, setShowGuidelines] = useState(false)
 
   const characterCount = commentText.length
   const isValid = characterCount >= 20 && characterCount <= 500
@@ -34,7 +35,7 @@ export default function CommentSection({ wordId, comments, userComment, currentU
 
     try {
       if (userComment) {
-        await updateComment(userComment.id, commentText)
+        await updateComment(userComment.id, commentText, wordId)
       } else {
         await addComment({ word_id: wordId, comment_text: commentText })
       }
@@ -52,7 +53,7 @@ export default function CommentSection({ wordId, comments, userComment, currentU
 
     setIsSubmitting(true)
     try {
-      await deleteComment(userComment.id)
+      await deleteComment(userComment.id, wordId)
       setCommentText('')
     } catch (err: any) {
       setError(err.message || 'Failed to delete comment')
@@ -63,7 +64,7 @@ export default function CommentSection({ wordId, comments, userComment, currentU
 
   const handleVote = async (commentId: string, voteType: 1 | -1) => {
     try {
-      await voteOnComment({ target_id: commentId, vote_type: voteType })
+      await voteOnComment({ target_id: commentId, vote_type: voteType }, wordId)
     } catch (err: any) {
       setError(err.message || 'Failed to vote')
     }
@@ -71,7 +72,7 @@ export default function CommentSection({ wordId, comments, userComment, currentU
 
   const handleFlag = async (commentId: string) => {
     try {
-      await flagComment(commentId)
+      await flagComment(commentId, wordId)
     } catch (err: any) {
       setError(err.message || 'Failed to flag comment')
     }
@@ -92,17 +93,46 @@ export default function CommentSection({ wordId, comments, userComment, currentU
       {/* User's comment form */}
       {currentUserId && (
         <div className="border border-gray-300 rounded-lg p-4 bg-gray-50">
+          {/* Guidelines toggle */}
+          <button
+            type="button"
+            onClick={() => setShowGuidelines(!showGuidelines)}
+            className="text-sm text-primary-600 hover:text-primary-700 mb-3 flex items-center gap-1"
+          >
+            {showGuidelines ? '▼' : '▶'} Comment Guidelines & Examples
+          </button>
+
+          {/* Collapsible guidelines */}
+          {showGuidelines && (
+            <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm space-y-2">
+              <p className="font-medium text-blue-900">Helpful comments:</p>
+              <ul className="list-none text-blue-800 space-y-1 ml-2">
+                <li>✓ "My family says it like..."</li>
+                <li>✓ "We also use this to mean..."</li>
+                <li>✓ "Old people say [X], young people say [Y]"</li>
+                <li>✓ "In my village we say..."</li>
+                <li>✓ "Example: [how you'd use it in a sentence]"</li>
+                <li>✓ "My mum/bubu still uses this word for..."</li>
+                <li>✓ "This is an old/archaic word - we don't use it anymore"</li>
+                <li>✓ "Only used in ceremonies/special occasions"</li>
+              </ul>
+              <p className="text-xs text-blue-700 italic mt-2">
+                Share your personal knowledge and family usage - that's what makes this dictionary special!
+              </p>
+            </div>
+          )}
+
           <form onSubmit={handleSubmit} className="space-y-3">
             <div>
               <label className="label text-sm">
-                {userComment ? 'Your Comment' : 'Add Context'}
+                {userComment ? 'Your Comment' : 'Add Linguistic Context'}
                 <span className="text-red-500"> *</span>
               </label>
               <textarea
                 value={commentText}
                 onChange={(e) => setCommentText(e.target.value)}
-                placeholder="Share historical usage, dialect notes, modern alternatives, or linguistic context... (20-500 characters)"
-                rows={3}
+                placeholder="e.g., 'My bubu uses this word for...' or 'Old people say [X], young people say [Y]' or 'In my village we say...' (20-500 characters)"
+                rows={4}
                 className={`input ${!isValid && commentText.length > 0 ? 'border-red-500' : ''}`}
                 disabled={isSubmitting || (userComment && !isEditing)}
               />
@@ -124,7 +154,7 @@ export default function CommentSection({ wordId, comments, userComment, currentU
               </div>
             )}
 
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               {userComment ? (
                 <>
                   {!isEditing ? (
@@ -201,21 +231,21 @@ export default function CommentSection({ wordId, comments, userComment, currentU
                   <div className="flex-1">
                     <p className="text-gray-800">{comment.comment_text}</p>
 
-                    <div className="flex items-center gap-3 mt-2 text-xs text-gray-500">
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-xs text-gray-500">
                       <span className="capitalize">
                         {comment.profile?.connection_type?.replace('_', ' ')}
                       </span>
-                      <span>•</span>
+                      <span className="hidden sm:inline">•</span>
                       <span>{new Date(comment.created_at).toLocaleDateString()}</span>
                       {comment.updated_at !== comment.created_at && (
                         <>
-                          <span>•</span>
+                          <span className="hidden sm:inline">•</span>
                           <span className="italic">edited</span>
                         </>
                       )}
                       {isOwnComment && (
                         <>
-                          <span>•</span>
+                          <span className="hidden sm:inline">•</span>
                           <span className="text-primary-600 font-medium">Your comment</span>
                         </>
                       )}
@@ -284,8 +314,10 @@ export default function CommentSection({ wordId, comments, userComment, currentU
         </div>
       )}
 
-      <div className="text-xs text-gray-500 border-t pt-3">
-        <p><strong>Note:</strong> Comments are for adding linguistic context, historical usage, dialect variations, or modern alternatives. Use voting to indicate helpful comments.</p>
+      <div className="text-xs text-gray-500 border-t pt-3 space-y-2">
+        <p><strong>💡 Comment Purpose:</strong> Share how your family uses this word, regional differences, generational changes, or cultural context.</p>
+        <p className="leading-relaxed"><strong>✅ Good:</strong> "My mum says..." <span className="hidden sm:inline">•</span><br className="sm:hidden" /> "Old people say X, young say Y" <span className="hidden sm:inline">•</span><br className="sm:hidden" /> "In my village..." <span className="hidden sm:inline">•</span><br className="sm:hidden" /> "Example: [sentence]"</p>
+        <p><strong>❌ Avoid:</strong> Arguing about translations <span className="hidden sm:inline">•</span><br className="sm:hidden" /> Vague comments <span className="hidden sm:inline">•</span><br className="sm:hidden" /> Off-topic discussion</p>
       </div>
     </div>
   )

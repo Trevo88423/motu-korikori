@@ -118,12 +118,17 @@ export default async function WordDetailPage({
       contributionGroups.push({
         gloss,
         count: contribs.length,
+        full_count: contribs.filter((c: any) => c.agreement_type === 'full').length,
+        agree_count: contribs.filter((c: any) => c.agreement_type === 'agree').length,
         weighted_count: weightedCount,
         contributors: contribs.map((c: any) => ({
           connection_type: c.profile?.connection_type || 'other',
           trust_score: c.profile?.trust_score || 1.0,
+          agreement_type: c.agreement_type || 'full',
         })),
-        audio_urls: contribs.map((c: any) => c.audio_url).filter(Boolean) as string[],
+        audio_urls: contribs
+          .filter((c: any) => c.audio_url)
+          .map((c: any) => ({ url: c.audio_url, user_id: c.user_id })),
       })
     })
   }
