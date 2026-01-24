@@ -32,7 +32,7 @@ export default function WordCard({ word, userContribution, allContributions, com
   const [englishGloss, setEnglishGloss] = useState(userContribution?.english_gloss || '')
   const [audioUrl, setAudioUrl] = useState<string | null>(userContribution?.audio_url || null)
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null)
-  const [confidence, setConfidence] = useState(userContribution?.confidence || '')
+  const [confidence, setConfidence] = useState<string>(userContribution?.confidence || '')
   const [notes, setNotes] = useState(userContribution?.notes || '')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -210,7 +210,7 @@ export default function WordCard({ word, userContribution, allContributions, com
         word_id: word.id,
         english_gloss: englishGloss.trim(),
         audio_url: uploadedAudioUrl,
-        confidence,
+        confidence: confidence as 'certain' | 'somewhat_certain' | 'unsure',
       })
 
       // Success! The parent component will handle navigation
