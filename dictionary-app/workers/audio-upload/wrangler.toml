@@ -8,4 +8,4 @@ binding = "AUDIO_BUCKET"
 bucket_name = "motu-dictionary-audio"
 
 [vars]
-ALLOWED_ORIGINS = "http://localhost:3000,https://your-production-domain.com"
+ALLOWED_ORIGINS = "http://localhost:3000,https://truemotu.org,https://motu-korikori.vercel.app"
