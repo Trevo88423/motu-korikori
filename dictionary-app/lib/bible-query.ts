@@ -33,8 +33,8 @@ class BibleQuery {
   private indicesPath: string
 
   private constructor() {
-    // Path to indices directory
-    this.indicesPath = join(process.cwd(), '..', 'files', 'bible_data', 'indices')
+    // Path to indices directory (inside dictionary-app for Vercel deployment)
+    this.indicesPath = join(process.cwd(), 'data', 'bible-indices')
   }
 
   static getInstance(): BibleQuery {

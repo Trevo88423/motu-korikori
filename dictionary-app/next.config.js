@@ -5,6 +5,9 @@ const nextConfig = {
       bodySizeLimit: '5mb',
     },
   },
+  outputFileTracingIncludes: {
+    '/api/bible/random-verse': ['./data/bible-indices/**'],
+  },
 }
 
 module.exports = nextConfig
