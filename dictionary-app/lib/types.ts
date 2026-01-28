@@ -75,6 +75,9 @@ export interface Word {
   consensus_confidence: number;
   total_contributions: number;
   unique_contributors: number;
+  ai_morphology: string | null;
+  ai_patterns: string | null;
+  ai_notes: string | null;
   created_at: string;
   updated_at: string;
 }

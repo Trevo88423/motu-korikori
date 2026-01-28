@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import ConsensusBar from '@/components/ConsensusBar'
 import CommentSection from '@/components/CommentSection'
+import LinguisticAnalysis from '@/components/LinguisticAnalysis'
 import type { Word, ContributionWithProfile, ContributionGroup } from '@/lib/types'
 
 export const dynamic = 'force-dynamic'
@@ -231,6 +232,15 @@ export default async function WordDetailPage({
               </div>
             </div>
           </div>
+        )}
+
+        {/* Linguistic Analysis - AI Generated */}
+        {(word.ai_morphology || word.ai_patterns || word.ai_notes) && (
+          <LinguisticAnalysis
+            morphology={word.ai_morphology}
+            patterns={word.ai_patterns}
+            notes={word.ai_notes}
+          />
         )}
 
         {/* Consensus Bar */}
