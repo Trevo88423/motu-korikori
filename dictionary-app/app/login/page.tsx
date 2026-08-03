@@ -4,6 +4,19 @@ import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 
+// Banner text is chosen from a fixed set of codes, never taken from the URL.
+// Rendering ?error= verbatim let anyone craft a truemotu.org link that displayed
+// arbitrary text above the login form.
+const ERROR_MESSAGES: Record<string, string> = {
+  link_invalid:
+    'That link is no longer valid — it may have expired or already been used. Request a new one below.',
+}
+
+const MESSAGE_MESSAGES: Record<string, string> = {
+  email_verified: 'Your email is verified. You can log in now.',
+  password_updated: 'Your password has been updated. Log in with your new password.',
+}
+
 function LoginForm() {
   const searchParams = useSearchParams()
   const [loading, setLoading] = useState(false)
@@ -13,8 +26,8 @@ function LoginForm() {
   useEffect(() => {
     const errorParam = searchParams.get('error')
     const messageParam = searchParams.get('message')
-    if (errorParam) setError(errorParam)
-    if (messageParam) setMessage(messageParam)
+    if (errorParam) setError(ERROR_MESSAGES[errorParam] ?? 'Something went wrong. Please try again.')
+    if (messageParam && MESSAGE_MESSAGES[messageParam]) setMessage(MESSAGE_MESSAGES[messageParam])
   }, [searchParams])
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {

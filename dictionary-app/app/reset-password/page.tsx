@@ -43,7 +43,7 @@ export default function ResetPasswordPage() {
 
       // Redirect to login after a short delay
       setTimeout(() => {
-        router.push('/login?message=Password reset successful. Please log in with your new password.')
+        router.push('/login?message=password_updated')
       }, 2000)
     } catch (error: any) {
       setError(error.message || 'Failed to reset password. Please try again.')
