@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation'
-import { createServerComponentClient, getCurrentUserProfile } from '@/lib/supabase'
+import { createServerComponentClient, getCurrentUserProfile, getTotalWordCount } from '@/lib/supabase'
 import Link from 'next/link'
 
 export const dynamic = 'force-dynamic'
@@ -33,7 +33,8 @@ export default async function DashboardPage() {
   const consensusRate = totalContributions > 0 ? (matchingContributions / totalContributions) * 100 : 0
 
   // Calculate progress percentage
-  const progressPercentage = (totalContributions / 15610) * 100
+  const totalWords = await getTotalWordCount()
+  const progressPercentage = totalWords > 0 ? (totalContributions / totalWords) * 100 : 0
 
   // Get streak information
   const streakDays = profile.streak_days
@@ -85,7 +86,7 @@ export default async function DashboardPage() {
                 {progressPercentage.toFixed(1)}%
               </p>
               <p className="text-xs text-gray-500 mt-1">
-                {(15610 - totalContributions).toLocaleString()} words remaining
+                {Math.max(0, totalWords - totalContributions).toLocaleString()} words remaining
               </p>
             </div>
             <div className="w-12 h-12 bg-secondary-100 rounded-lg flex items-center justify-center">
@@ -142,7 +143,7 @@ export default async function DashboardPage() {
         <div className="flex justify-between items-center mb-2">
           <h3 className="font-semibold text-gray-900">Dictionary Progress</h3>
           <span className="text-sm text-gray-600">
-            {totalContributions.toLocaleString()} / 15,610
+            {totalContributions.toLocaleString()} / {totalWords.toLocaleString()}
           </span>
         </div>
         <div className="w-full bg-gray-200 rounded-full h-4">

@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation'
-import { createServerComponentClient, getCurrentUserProfile } from '@/lib/supabase'
+import { createServerComponentClient, getCurrentUserProfile, getTotalWordCount } from '@/lib/supabase'
 import ContributeClient from '@/components/ContributeClient'
 import { saveContribution } from './actions'
 import { markWordComplete } from './completion-actions'
@@ -20,6 +20,7 @@ export default async function ContributePage({
   const params = await searchParams
   const supabase = await createServerComponentClient()
   const profile = await getCurrentUserProfile()
+  const totalWords = await getTotalWordCount()
 
   if (!profile) {
     redirect('/login')
@@ -76,7 +77,7 @@ export default async function ContributePage({
         <div className="card">
           <h1 className="text-4xl font-bold text-primary-900 mb-4">Congratulations!</h1>
           <p className="text-xl text-gray-700 mb-4">
-            You've contributed to all {15610} words in the dictionary!
+            You've contributed to all {totalWords.toLocaleString()} words in the dictionary!
           </p>
           <p className="text-gray-600 mb-8">
             Thank you for your incredible dedication to preserving True Motu.
@@ -151,13 +152,13 @@ export default async function ContributePage({
         <div className="flex justify-between text-sm text-gray-600 mb-2">
           <span>Your Progress</span>
           <span>
-            {profile.contribution_count.toLocaleString()} / 15,610 words
+            {profile.contribution_count.toLocaleString()} / {totalWords.toLocaleString()} words
           </span>
         </div>
         <div className="w-full bg-gray-200 rounded-full h-2">
           <div
             className="bg-primary-600 h-2 rounded-full transition-all"
-            style={{ width: `${(profile.contribution_count / 15610) * 100}%` }}
+            style={{ width: `${totalWords > 0 ? (profile.contribution_count / totalWords) * 100 : 0}%` }}
           />
         </div>
       </div>

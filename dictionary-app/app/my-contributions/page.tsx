@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation'
-import { createServerComponentClient, getCurrentUserProfile } from '@/lib/supabase'
+import { createServerComponentClient, getCurrentUserProfile, getTotalWordCount } from '@/lib/supabase'
 import Link from 'next/link'
 
 export const dynamic = 'force-dynamic'
@@ -7,6 +7,7 @@ export const dynamic = 'force-dynamic'
 export default async function MyContributionsPage() {
   const supabase = await createServerComponentClient()
   const profile = await getCurrentUserProfile()
+  const totalWords = await getTotalWordCount()
 
   if (!profile) {
     redirect('/login')
@@ -100,7 +101,7 @@ export default async function MyContributionsPage() {
           <div className="text-sm text-gray-600">
             <strong>Trust Score:</strong> {profile.trust_score.toFixed(1)}x
             <span className="ml-4">
-              <strong>Progress:</strong> {((profile.contribution_count / 15610) * 100).toFixed(1)}% of dictionary
+              <strong>Progress:</strong> {(totalWords > 0 ? (profile.contribution_count / totalWords) * 100 : 0).toFixed(1)}% of dictionary
             </span>
           </div>
         </div>

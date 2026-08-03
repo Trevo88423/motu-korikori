@@ -1,7 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { createServerComponentClient, getCurrentUserProfile } from '@/lib/supabase'
+import { createAdminClient, getCurrentUserProfile } from '@/lib/supabase'
 
 async function requireAdmin() {
   const profile = await getCurrentUserProfile()
@@ -13,13 +13,21 @@ async function requireAdmin() {
   return profile
 }
 
+// Moderation writes go through the service-role client. `authenticated` no
+// longer holds UPDATE on profiles' privileged columns (status, is_admin,
+// trust_score, ...) — see supabase/migrations/20260803_01_lock_down_profile_updates.sql.
+// Authorisation is enforced by requireAdmin() above, which every action calls first.
+async function adminDb() {
+  return createAdminClient()
+}
+
 // Word Moderation Actions
 
 export async function verifyWord(formData: FormData) {
   const admin = await requireAdmin()
   const wordId = formData.get('wordId') as string
 
-  const supabase = await createServerComponentClient()
+  const supabase = await adminDb()
 
   // Update word status
   await supabase
@@ -45,7 +53,7 @@ export async function flagWord(formData: FormData) {
   const admin = await requireAdmin()
   const wordId = formData.get('wordId') as string
 
-  const supabase = await createServerComponentClient()
+  const supabase = await adminDb()
 
   await supabase
     .from('words')
@@ -69,7 +77,7 @@ export async function unflagWord(formData: FormData) {
   const admin = await requireAdmin()
   const wordId = formData.get('wordId') as string
 
-  const supabase = await createServerComponentClient()
+  const supabase = await adminDb()
 
   await supabase
     .from('words')
@@ -95,7 +103,7 @@ export async function warnUser(formData: FormData) {
   const admin = await requireAdmin()
   const userId = formData.get('userId') as string
 
-  const supabase = await createServerComponentClient()
+  const supabase = await adminDb()
 
   await supabase
     .from('profiles')
@@ -118,7 +126,7 @@ export async function suspendUser(formData: FormData) {
   const admin = await requireAdmin()
   const userId = formData.get('userId') as string
 
-  const supabase = await createServerComponentClient()
+  const supabase = await adminDb()
 
   await supabase
     .from('profiles')
@@ -141,7 +149,7 @@ export async function banUser(formData: FormData) {
   const admin = await requireAdmin()
   const userId = formData.get('userId') as string
 
-  const supabase = await createServerComponentClient()
+  const supabase = await adminDb()
 
   await supabase
     .from('profiles')
@@ -164,7 +172,7 @@ export async function excludeFromAI(formData: FormData) {
   const admin = await requireAdmin()
   const userId = formData.get('userId') as string
 
-  const supabase = await createServerComponentClient()
+  const supabase = await adminDb()
 
   await supabase
     .from('profiles')
@@ -187,7 +195,7 @@ export async function excludeAllContributions(formData: FormData) {
   const admin = await requireAdmin()
   const userId = formData.get('userId') as string
 
-  const supabase = await createServerComponentClient()
+  const supabase = await adminDb()
 
   // Mark all contributions as excluded
   await supabase

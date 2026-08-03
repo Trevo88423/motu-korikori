@@ -1,4 +1,4 @@
-import { createServerComponentClient } from '@/lib/supabase'
+import { createServerComponentClient, getTotalWordCount } from '@/lib/supabase'
 import Link from 'next/link'
 import type { Word } from '@/lib/types'
 
@@ -26,6 +26,8 @@ export default async function DictionaryPage({
   const perPage = 50
 
   const supabase = await createServerComponentClient()
+  const totalWords = await getTotalWordCount()
+  const hasFilters = Boolean(search || englishSearch || letter || status !== 'all')
 
   // Build query
   let query = supabase
@@ -95,7 +97,9 @@ export default async function DictionaryPage({
       <div className="mb-6 sm:mb-8">
         <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">True Motu Dictionary</h1>
         <p className="text-sm sm:text-base text-gray-600">
-          Browse all {count?.toLocaleString() || '15,610'} words in the dictionary
+          {hasFilters
+            ? `Showing ${(count || 0).toLocaleString()} of ${totalWords.toLocaleString()} words`
+            : `Browse all ${totalWords.toLocaleString()} words in the dictionary`}
         </p>
       </div>
 

@@ -1,9 +1,10 @@
 import Link from 'next/link'
-import { createServerComponentClient } from '@/lib/supabase'
+import { createServerComponentClient, getTotalWordCount } from '@/lib/supabase'
 
 export default async function Home() {
   const supabase = await createServerComponentClient()
   const { data: { user } } = await supabase.auth.getUser()
+  const totalWords = await getTotalWordCount()
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
@@ -50,7 +51,7 @@ export default async function Home() {
 
           <div className="card">
             <div className="text-3xl sm:text-4xl mb-3 sm:mb-4">📚</div>
-            <h3 className="text-lg sm:text-xl font-semibold mb-2">15,610 Words</h3>
+            <h3 className="text-lg sm:text-xl font-semibold mb-2">{totalWords.toLocaleString()} Words</h3>
             <p className="text-gray-600">
               Comprehensive vocabulary sourced from Bible translations and linguistic research.
               Help us add translations for all of them.

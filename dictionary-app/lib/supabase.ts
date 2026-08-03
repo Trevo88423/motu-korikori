@@ -3,6 +3,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
+import { cache } from 'react'
 
 // Environment variables
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -58,6 +59,20 @@ export function createAdminClient() {
     }
   })
 }
+
+// Total number of words in the dictionary.
+// Cached per-request so several components can call it without repeat queries.
+export const getTotalWordCount = cache(async (): Promise<number> => {
+  const supabase = await createServerComponentClient()
+
+  const { count, error } = await supabase
+    .from('words')
+    .select('*', { count: 'exact', head: true })
+
+  if (error || count === null) return 0
+
+  return count
+})
 
 // Helper function to check if user is admin
 export async function isUserAdmin(userId: string): Promise<boolean> {

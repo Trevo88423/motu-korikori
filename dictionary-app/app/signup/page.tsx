@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation'
 import SignupForm from '@/components/SignupForm'
 import ConsentForm from '@/components/ConsentForm'
 import { createClientComponentClient } from '@/lib/supabase-client'
-import { createUserProfile } from './actions'
 import type { SignupFormData, AgeRange, ConnectionType } from '@/lib/types'
 
 export const dynamic = 'force-dynamic'
@@ -122,12 +121,28 @@ export default function SignupPage() {
     setLoading(true)
 
     try {
-      // 1. Sign up the user with email verification
+      // Sign up. The profile row is created by the on_auth_user_created trigger
+      // inside the SAME transaction as the auth.users insert, from the metadata
+      // below — see supabase/migrations/20260803_02_atomic_signup.sql.
+      // Either both rows exist or neither does; there is no second write to fail.
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
         options: {
           emailRedirectTo: `${window.location.origin}/auth/callback?type=signup`,
+          data: {
+            name: formData.name,
+            age_range: formData.age_range,
+            locations: formData.locations,
+            connection_type: formData.connection_type,
+            who_taught: formData.who_taught || '',
+            consent_tos: formData.consent_tos,
+            consent_dictionary: formData.consent_dictionary,
+            consent_ai_training: formData.consent_ai_training,
+            is_18_or_older: formData.is_18_or_older,
+            guardian_name: formData.guardian_name || '',
+            guardian_email: formData.guardian_email || '',
+          },
         },
       })
 
@@ -135,62 +150,6 @@ export default function SignupPage() {
 
       if (!authData.user) {
         throw new Error('User creation failed')
-      }
-
-      // 2. Create profile with extended data using Server Action
-      // Use a small delay to allow cookie storage to complete and avoid header issues on mobile
-      await new Promise(resolve => setTimeout(resolve, 100))
-
-      let profileResult
-      try {
-        profileResult = await createUserProfile({
-          userId: authData.user.id,
-          email: formData.email,
-          name: formData.name,
-          age_range: formData.age_range,
-          locations: formData.locations,
-          connection_type: formData.connection_type,
-          who_taught: formData.who_taught || '',
-          consent_tos: formData.consent_tos,
-          consent_dictionary: formData.consent_dictionary,
-          consent_ai_training: formData.consent_ai_training,
-          is_18_or_older: formData.is_18_or_older,
-          guardian_name: formData.guardian_name,
-          guardian_email: formData.guardian_email,
-          guardian_consent: formData.guardian_consent,
-        })
-      } catch (profileError: any) {
-        // Handle header/cookie issues on some mobile browsers
-        if (profileError.message?.includes('Headers') || profileError.message?.includes('header')) {
-          // Retry without cookies by using fetch directly to an API route
-          const response = await fetch('/api/create-profile', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              userId: authData.user.id,
-              email: formData.email,
-              name: formData.name,
-              age_range: formData.age_range,
-              locations: formData.locations,
-              connection_type: formData.connection_type,
-              who_taught: formData.who_taught || '',
-              consent_tos: formData.consent_tos,
-              consent_dictionary: formData.consent_dictionary,
-              consent_ai_training: formData.consent_ai_training,
-              is_18_or_older: formData.is_18_or_older,
-              guardian_name: formData.guardian_name,
-              guardian_email: formData.guardian_email,
-              guardian_consent: formData.guardian_consent,
-            }),
-          })
-          profileResult = await response.json()
-        } else {
-          throw profileError
-        }
-      }
-
-      if (!profileResult.success) {
-        throw new Error(profileResult.error || 'Failed to create profile')
       }
 
       // Success! Redirect to verify email page

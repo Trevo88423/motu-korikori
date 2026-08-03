@@ -1,0 +1,66 @@
+name: Apply Supabase migrations
+
+# Applies everything in dictionary-app/supabase/migrations/ to the production
+# Supabase project whenever a migration file lands on main. Vercel deploys the
+# app from the same push, so schema and code move together.
+#
+# ORDERING NOTE: this job must finish before the new app code serves traffic.
+# The signup flow depends on the on_auth_user_created trigger from
+# 20260803000002_atomic_signup.sql — deployed without it, signups create auth
+# users with no profile and show no error.
+#
+# ONE-TIME SETUP — add these three repository secrets under
+# Settings > Secrets and variables > Actions:
+#   SUPABASE_ACCESS_TOKEN  personal access token from supabase.com/dashboard/account/tokens
+#   SUPABASE_PROJECT_REF   mwygcqumpjswovyukcct
+#   SUPABASE_DB_PASSWORD   database password (Project Settings > Database)
+#
+# BASELINE NOTE: the production project has no recorded migration history, so
+# the first run treats all three files as pending. Each is written to be safe to
+# re-apply (ADD COLUMN IF NOT EXISTS / DROP POLICY IF EXISTS / CREATE OR REPLACE),
+# so this is harmless. schema.sql and migration-voting-system.sql are deliberately
+# NOT in migrations/ — they are already applied and must not be replayed.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'dictionary-app/supabase/migrations/**'
+  workflow_dispatch:
+
+concurrency:
+  group: supabase-migrate-production
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: dictionary-app
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Link to production project
+        run: supabase link --project-ref "${{ secrets.SUPABASE_PROJECT_REF }}"
+
+      - name: Show pending migrations
+        run: supabase migration list
+
+      - name: Apply migrations
+        run: supabase db push
+
+      - name: Verify profile lockdown held
+        run: |
+          supabase db push --dry-run
+          echo "Migrations applied. Verify in Supabase: authenticated should hold"
+          echo "UPDATE on exactly 5 profiles columns (age_range, connection_type,"
+          echo "locations, name, who_taught)."

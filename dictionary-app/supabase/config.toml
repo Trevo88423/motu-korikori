@@ -1,0 +1,6 @@
+# Supabase CLI project config. Required for `supabase link` / `supabase db push`
+# to run from this directory (see .github/workflows/db-migrate.yml).
+project_id = "motu-korikori"
+
+[db]
+major_version = 17
