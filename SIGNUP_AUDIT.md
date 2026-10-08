@@ -62,8 +62,16 @@ which is why `supabase/schema.sql` looks correct. Note `schema.sql` also disagre
 production on the admin policies (`(SELECT is_admin FROM profiles WHERE id = auth.uid()) = TRUE`
 in the repo, versus `((auth.uid() = id) OR (is_admin = true))` live).
 
-**Fix:** drop the blanket policy and expose a view restricted to the columns the leaderboard
-actually needs (name, contribution_count, trust_score, connection_type).
+**Fixed 2026-10-08** by `supabase/migrations/20261008000001_restrict_anon_profile_columns.sql`.
+RLS cannot restrict columns, so the policy was left in place and `anon`'s SELECT grant was
+narrowed to the six columns the public pages actually render: `id`, `name`,
+`connection_type`, `trust_score`, `contribution_count`, `status`. `is_admin` is deliberately
+excluded, since finding 6's attack began by locating an administrator with
+`?is_admin=eq.true`.
+
+Still open: `authenticated` retains full SELECT, because `getCurrentUserProfile` reads the
+caller's own row with `select('*')` and column grants are role-wide rather than row-aware.
+A signed-in member can therefore still read other members' email addresses.
 
 ### 2.2 — The age question defaults to "under 18" without appearing selected
 
@@ -200,16 +208,22 @@ Code changes in the working tree: signup passes metadata instead of doing a seco
 admin actions moved to the service-role client; both unauthenticated service-role profile
 writers deleted; hardcoded word count replaced. Build passes.
 
-### Not yet applied to production
+### Applied to production and verified end to end
 
-Production still has the privilege-escalation hole and broken signup. Every write path from the
-agent session — Supabase MCP, `.claude/settings.json`, and `git add` — was blocked by the
-permission classifier, so nothing reached production.
+Both migrations applied, code deployed, and the whole journey exercised against the live site:
 
-**Ordering that must be respected:** migration `...0002` has to land before or with the code
-deploy. The new signup code no longer writes the profile itself; deployed against a database
-without the trigger, every signup would create an auth user with no profile and show no error —
-silent orphans, worse than the current visible failure.
+| Check | Result |
+|---|---|
+| `UPDATE profiles SET is_admin = true` as a real authenticated user | `ERROR 42501: permission denied` |
+| `authenticated` UPDATE grants / `anon` UPDATE grants | 5 columns / 0 |
+| Real signup at truemotu.org | complete profile row, all consents and demographics intact |
+| Confirmation link clicked | session cookies set, `email_confirmed_at` set, token consumed, landed logged in |
+| `GET /api/create-profile` | 404 — endpoint gone |
+
+The confirmation token carried a `pkce_` prefix, confirming the PKCE `?code=` branch really was
+the live path and the `token_hash` branch was never in play — so this was a live outage, not a
+latent one. Test accounts were deleted after each check; the remaining 8/2/6 is the six
+historical orphans, untouched.
 
 ### Automated path (removes the manual step)
 
