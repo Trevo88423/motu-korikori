@@ -6,20 +6,22 @@ name: Apply Supabase migrations
 #
 # ORDERING NOTE: this job must finish before the new app code serves traffic.
 # The signup flow depends on the on_auth_user_created trigger from
-# 20260803000002_atomic_signup.sql — deployed without it, signups create auth
+# 20260803084739_atomic_signup.sql — deployed without it, signups create auth
 # users with no profile and show no error.
 #
-# ONE-TIME SETUP — add these three repository secrets under
+# ONE-TIME SETUP — add these two repository secrets under
 # Settings > Secrets and variables > Actions:
 #   SUPABASE_ACCESS_TOKEN  personal access token from supabase.com/dashboard/account/tokens
-#   SUPABASE_PROJECT_REF   mwygcqumpjswovyukcct
 #   SUPABASE_DB_PASSWORD   database password (Project Settings > Database)
+# Until both exist every run fails at "Link to production project".
 #
-# BASELINE NOTE: the production project has no recorded migration history, so
-# the first run treats all three files as pending. Each is written to be safe to
-# re-apply (ADD COLUMN IF NOT EXISTS / DROP POLICY IF EXISTS / CREATE OR REPLACE),
-# so this is harmless. schema.sql and migration-voting-system.sql are deliberately
-# NOT in migrations/ — they are already applied and must not be replayed.
+# HISTORY NOTE: file versions must match production's
+# supabase_migrations.schema_migrations exactly, or `db push` refuses to run.
+# Production records 20260801051846_remote_schema (the baseline dump),
+# 20260803084707_lock_down_profile_updates and 20260803084739_atomic_signup.
+# Never rename an applied migration; create new ones with `npm run db:new`.
+# schema.sql and migration-voting-system.sql are historical and are NOT in
+# migrations/ — they are already applied and must not be replayed.
 
 on:
   push:
@@ -39,6 +41,7 @@ jobs:
       run:
         working-directory: dictionary-app
     env:
+      SUPABASE_PROJECT_REF: mwygcqumpjswovyukcct
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
       SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
 
@@ -47,10 +50,10 @@ jobs:
 
       - uses: supabase/setup-cli@v1
         with:
-          version: latest
+          version: 2.120.0
 
       - name: Link to production project
-        run: supabase link --project-ref "${{ secrets.SUPABASE_PROJECT_REF }}"
+        run: supabase link --project-ref "$SUPABASE_PROJECT_REF"
 
       - name: Show pending migrations
         run: supabase migration list

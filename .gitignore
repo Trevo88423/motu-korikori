@@ -58,3 +58,7 @@ ENV/
 
 # Build artifacts
 dictionary-app/supabase/seed.sql
+
+# Supabase CLI local state
+dictionary-app/supabase/.temp/
+dictionary-app/supabase/.branches/
