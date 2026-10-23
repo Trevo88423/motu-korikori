@@ -48,8 +48,17 @@ npm run db:start     # local Supabase in Docker (needs Docker Desktop)
 npm run db:reset     # rebuild local DB from migrations/
 ```
 
-Point `.env.local` at the local stack (URL/keys printed by `db:start`) when testing schema
-or signup changes, so tests never touch production data.
+`.env.local` points at the local stack by default (production lines are kept commented
+underneath). Test schema and signup changes locally, never against production.
+
+- Docker Desktop runs on WSL 2. It's installed per-user, so its CLI lives in
+  `%LOCALAPPDATA%\Programs\DockerDesktop\resources\bin`; a shell opened before the install
+  won't have it on PATH.
+- `supabase/seed.sql` (gitignored, about 10 MB) is a dump of production's `words` table only:
+  no profiles or other user data. `db:reset` loads it automatically. Regenerate it with
+  `supabase db dump --linked --data-only --schema public -x <every public table except words> -f supabase/seed.sql`.
+- Email confirmations are on locally, as in prod (`supabase/config.toml`). Signup emails
+  land in Mailpit at http://127.0.0.1:54324; Studio is at http://127.0.0.1:54323.
 
 ## Conventions
 
