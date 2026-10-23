@@ -29,7 +29,7 @@ export default async function AdminPage() {
   // Fetch low trust users
   const { data: lowTrustUsers } = await supabase
     .from('profiles')
-    .select('*')
+    .select('id, name, connection_type, trust_score, contribution_count, status')
     .lt('trust_score', 0.7)
     .order('trust_score', { ascending: true })
     .limit(20)

@@ -21,7 +21,7 @@ export default async function LeaderboardPage() {
   if (user && !topContributors?.find(c => c.id === user.id)) {
     const { count } = await supabase
       .from('profiles')
-      .select('*', { count: 'exact', head: true })
+      .select('id', { count: 'exact', head: true })
       .gt('contribution_count', topContributors?.[topContributors.length - 1]?.contribution_count || 0)
 
     if (count !== null) {
