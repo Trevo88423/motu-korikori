@@ -11,10 +11,12 @@
 --      "+ 1:1 <note> *" (the * is all that is left of \f*).
 --   3. 110 AI suggestions with an unbalanced parenthesis.
 --
--- Only formatting is removed. The Motu Bible is © 1959–1973 Bible Society of
--- Papua New Guinea, CC BY-NC-ND 4.0, so no verse wording is changed, verses
--- are never merged, and each excerpt keeps its reference. (The WEB English
--- is public domain.)
+-- Only inserts that aren't scripture are removed. The Motu Bible is
+-- © 1959–1973 Bible Society of Papua New Guinea, CC BY-NC-ND 4.0, and its
+-- terms forbid changing any words or punctuation, so every word and
+-- punctuation mark of each verse is kept exactly as published, verses are
+-- never merged, and each excerpt keeps its reference. (The WEB English is
+-- public domain; it gets the same treatment.)
 --
 -- Everything here is deterministic and safe to re-run: a repaired row no
 -- longer matches the repair conditions, and clean_scripture_text() leaves
@@ -205,22 +207,30 @@ BEGIN
     RETURN NULL;
   END IF;
 
+  -- Every rule below only deletes an insert that isn't scripture (USFM
+  -- markup, a translator's note, a * marker), together with the space that
+  -- delimited it. No word or punctuation mark of the verse is touched.
+
   -- USFM word attributes: \w Sheol|strong="H7585"\w*
   t := regexp_replace(t, '\|[a-z-]+="[^"]*"', '', 'g');
-  -- USFM character markers: \+w, \+w*, \it, \it*, \fl ...
-  t := regexp_replace(t, '\\\+?[a-z]+[0-9]*\*?', ' ', 'g');
+  -- USFM character markers. A closing marker (\+w*, \it*) has no delimiter;
+  -- an opening one (\+w, \it) is followed by the one space that ends it.
+  t := regexp_replace(t, '\\\+?[a-z]+[0-9]*\*', '', 'g');
+  t := regexp_replace(t, '\\\+?[a-z]+[0-9]*( |$)', '', 'g');
 
+  -- Notes: "+ 1:1 <note>", optionally ending in the * left from \f*. Each is
+  -- removed with the whitespace before it, where the \f marker sat.
   IF t ~ '(^|\s)\+\s\d' THEN
     FOREACH note IN ARRAY unmarked_notes LOOP
       IF strpos(t, note) > 0 THEN
         t := regexp_replace(
           t,
-          '(^|\s)\+\s\d+[:.]\d+(-\d+)?\s'
+          '(^|\s+)\+\s\d+[:.]\d+(-\d+)?\s'
             || regexp_replace(note, '([.^$*+?()\[\]{}|\\])', '\\\1', 'g')
             -- "or, seed" must not match the start of "or, seeds"
             || CASE WHEN note ~ '[[:alnum:]]$' THEN '(?![[:alnum:]])' ELSE '' END
             || '(\s*\*)?',
-          ' ', 'g');
+          '', 'g');
       END IF;
     END LOOP;
     -- A row that is nothing but a note (a verse WEB moved to a footnote,
@@ -228,23 +238,20 @@ BEGIN
     IF t ~ '^\s*\+\s\d+[:.]\d+(-\d+)?\s[^*]*\*?\s*$' THEN
       t := regexp_replace(t, '^\s*\+\s\d+[:.]\d+(-\d+)?\s', '');
     END IF;
-    -- "+ 1:1 <note> *": a footnote that kept its end marker.
-    t := regexp_replace(t, '(^|\s)\+\s\d+[:.]\d+(-\d+)?\s[^*]*\*', ' ', 'g');
+    -- "+ 1:1 <note> *": a note that kept its end marker.
+    t := regexp_replace(t, '(^|\s+)\+\s\d+[:.]\d+(-\d+)?\s[^*]*\*', '', 'g');
     -- "+ 1:1 <note>" at the end of the text.
-    t := regexp_replace(t, '(\S)\s+\+\s\d+[:.]\d+(-\d+)?\s.*$', '\1');
+    t := regexp_replace(t, '\s+\+\s\d+[:.]\d+(-\d+)?\s.*$', '');
   END IF;
 
-  -- Stray * (from \it ...\it*, \f*, "*****" separators). Removed with the
-  -- space before it, never replaced: the Motu text is CC BY-NC-ND, so its
-  -- wording stays exactly as published ("\it gold\it*darikidia" stays
-  -- "golddarikidia").
-  t := regexp_replace(t, '\s*\*+', '', 'g');
-  -- Whitespace: collapse, then none after an opening quote or before
-  -- closing punctuation, and none inside a contraction (don’ t).
-  t := btrim(regexp_replace(t, '\s+', ' ', 'g'));
-  t := regexp_replace(t, '([“‘(]) ', '\1', 'g');
-  t := regexp_replace(t, '([^[:space:][:punct:]]) ([,.;:!?)])', '\1\2', 'g');
-  t := regexp_replace(t, '(\w)’ (t|s|ll|re|ve|d|m)\M', '\1’\2', 'g');
+  -- Remaining * markers (left from \it ...\it* and \f*), with the space
+  -- before them. "\it gold\it*darikidia" stays "golddarikidia", as published.
+  -- A run of stars is the published "*****" divider in the Motu Song of
+  -- Songs, so it stays.
+  t := regexp_replace(t, '\s*(?<!\*)\*{1,2}(?!\*)', '', 'g');
+  -- Removals can leave a doubled or edge space; the stored text has none of
+  -- its own (checked: 0 rows), so this only tidies what the removals left.
+  t := btrim(regexp_replace(t, '\s{2,}', ' ', 'g'));
   RETURN t;
 END;
 $fn$;
