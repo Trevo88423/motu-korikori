@@ -1,8 +1,25 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClientComponentClient } from '@/lib/supabase-client'
+
+// /reset-password sends people here when they didn't arrive through a
+// recovery link (or it has expired or been used).
+function RecoveryRequiredNotice() {
+  const searchParams = useSearchParams()
+  if (searchParams.get('error') !== 'recovery_link_required') return null
+
+  return (
+    <div className="p-3 mb-6 bg-yellow-50 border border-yellow-200 rounded-md">
+      <p className="text-sm text-yellow-800">
+        To set a new password, open the link in a password reset email. Links
+        work once and only for a short time, so request a new one below.
+      </p>
+    </div>
+  )
+}
 
 export default function ForgotPasswordPage() {
   const supabase = useMemo(() => createClientComponentClient(), [])
@@ -72,6 +89,10 @@ export default function ForgotPasswordPage() {
         <p className="text-gray-600 text-center mb-8">
           Enter your email address and we'll send you a link to reset your password.
         </p>
+
+        <Suspense fallback={null}>
+          <RecoveryRequiredNotice />
+        </Suspense>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
