@@ -97,9 +97,6 @@ export default async function ContributePage({
 
   const word = words[0] as Word
 
-  // IMPORTANT: Disable caching for these queries to ensure fresh data after deletion
-  const timestamp = new Date().getTime()
-
   // Check if user already contributed to this word
   // Use maybeSingle() to handle case where contribution was deleted
   const { data: userContribution } = await supabase
@@ -108,8 +105,6 @@ export default async function ContributePage({
     .eq('word_id', word.id)
     .eq('user_id', profile.id)
     .maybeSingle()
-
-  console.log(`[${timestamp}] Fetched userContribution:`, userContribution)
 
   // Get all contributions for this word (for consensus display)
   const { data: allContributions } = await supabase

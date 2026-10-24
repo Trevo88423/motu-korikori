@@ -40,7 +40,8 @@ export default function CommentSection({ wordId, comments, userComment, currentU
         await addComment({ word_id: wordId, comment_text: commentText })
       }
       setIsEditing(false)
-      setCommentText('')
+      // Leave commentText as saved: the box now shows the user's own comment,
+      // and clearing it left an empty box with "20 more needed" under it.
     } catch (err: any) {
       setError(err.message || 'Failed to save comment')
     } finally {
