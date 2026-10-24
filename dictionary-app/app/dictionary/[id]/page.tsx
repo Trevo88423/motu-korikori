@@ -173,9 +173,9 @@ export default async function WordDetailPage({
           <div className="flex items-center justify-center space-x-4 text-sm text-gray-600 mb-4">
             <span>Frequency: {word.frequency.toLocaleString()}</span>
             <span>•</span>
-            <span>{word.total_contributions} contributions</span>
+            <span>{word.total_contributions} {word.total_contributions === 1 ? 'contribution' : 'contributions'}</span>
             <span>•</span>
-            <span>{word.unique_contributors} contributors</span>
+            <span>{word.unique_contributors} {word.unique_contributors === 1 ? 'contributor' : 'contributors'}</span>
           </div>
 
           <span className={`inline-block px-3 py-1 text-sm font-medium rounded ${
