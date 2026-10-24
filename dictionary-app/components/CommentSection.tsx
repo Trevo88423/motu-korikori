@@ -124,11 +124,12 @@ export default function CommentSection({ wordId, comments, userComment, currentU
 
           <form onSubmit={handleSubmit} className="space-y-3">
             <div>
-              <label className="label text-sm">
+              <label htmlFor="comment-text" className="label text-sm">
                 {userComment ? 'Your Comment' : 'Add Linguistic Context'}
                 <span className="text-red-500"> *</span>
               </label>
               <textarea
+                id="comment-text"
                 value={commentText}
                 onChange={(e) => setCommentText(e.target.value)}
                 placeholder="e.g., 'My bubu uses this word for...' or 'Old people say [X], young people say [Y]' or 'In my village we say...' (20-500 characters)"

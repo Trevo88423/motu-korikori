@@ -376,10 +376,11 @@ export default function WordCard({ word, userContribution, allContributions, com
           {(!userContribution || userContribution.agreement_type === 'full') && (
           <>
           <div>
-            <label className="label">
+            <label htmlFor="english-gloss" className="label">
               Your English Translation<span className="text-red-500"> *</span>
             </label>
             <input
+              id="english-gloss"
               type="text"
               value={englishGloss}
               onChange={(e) => setEnglishGloss(e.target.value)}
