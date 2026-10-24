@@ -71,7 +71,7 @@ export default async function RootLayout({
         <footer className="bg-gray-800 text-white py-8 mt-16">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <p className="text-center text-gray-400">
-              &copy; 2024 True Motu Dictionary Project. Preserving Motu korikori for future generations.
+              &copy; {new Date().getFullYear()} True Motu Dictionary Project. Preserving Motu korikori for future generations.
             </p>
           </div>
         </footer>
