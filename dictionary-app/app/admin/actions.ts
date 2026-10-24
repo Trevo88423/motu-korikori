@@ -1,9 +1,11 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import { headers } from 'next/headers'
 import { createAdminClient } from '@/lib/supabase'
 import { requireActiveUserForAction, AccessDeniedError } from '@/lib/auth'
 import { calculateConsensus, recalculateAllConsensus } from '@/lib/consensus'
+import { sendEmail, escapeHtml } from '@/lib/email'
 
 async function requireAdmin() {
   const { profile } = await requireActiveUserForAction({ requireAdmin: true })
@@ -154,10 +156,13 @@ export async function suspendUser(formData: FormData) {
 
   const supabase = await adminDb()
 
-  await supabase
+  const { error } = await supabase
     .from('profiles')
     .update({ status: 'suspended' })
     .eq('id', userId)
+
+  // e.g. the last active admin (guard_admin_membership); don't block sign-in
+  if (error) throw new Error(error.message)
 
   await setSignInBlocked(supabase, userId, true)
 
@@ -179,10 +184,13 @@ export async function banUser(formData: FormData) {
 
   const supabase = await adminDb()
 
-  await supabase
+  const { error } = await supabase
     .from('profiles')
     .update({ status: 'banned' })
     .eq('id', userId)
+
+  // e.g. the last active admin (guard_admin_membership); don't block sign-in
+  if (error) throw new Error(error.message)
 
   await setSignInBlocked(supabase, userId, true)
 
@@ -281,6 +289,125 @@ export async function excludeAllContributions(formData: FormData) {
 
   revalidatePath('/admin')
   revalidatePath('/dictionary')
+}
+
+// Admin appointments (#64)
+//
+// grant_admin() / revoke_admin() make the change and write moderation_log in
+// one transaction. The database refuses removing the last active admin and
+// appointing an inactive or unconfirmed member, whoever calls it; the messages
+// it raises for those are written to be shown to the admin.
+
+export type AdminRoleResult =
+  | { ok: true; message: string }
+  | { ok: false; error: string }
+
+// check_violation (the safeguards) and insufficient_privilege / no_data_found
+// (the functions' own checks) carry messages meant for the UI.
+const SHOWN_DB_ERRORS = new Set(['23514', '42501', 'P0002'])
+
+function adminRoleError(error: { code?: string; message: string }): AdminRoleResult {
+  if (error.code && SHOWN_DB_ERRORS.has(error.code)) return { ok: false, error: error.message }
+  console.error('Admin role change failed:', error)
+  return { ok: false, error: "That didn't work. Try again." }
+}
+
+async function adminRoleActor(): Promise<{ id: string; display_name: string } | AdminRoleResult> {
+  try {
+    return await requireAdmin()
+  } catch (error) {
+    if (error instanceof AccessDeniedError) return { ok: false, error: error.message }
+    throw error
+  }
+}
+
+export async function makeAdmin(userId: string): Promise<AdminRoleResult> {
+  const actor = await adminRoleActor()
+  if ('ok' in actor) return actor
+  if (typeof userId !== 'string' || !userId) return { ok: false, error: 'Member not found.' }
+
+  const supabase = await adminDb()
+  const { data: appointed, error } = await supabase.rpc('grant_admin', {
+    p_target: userId,
+    p_actor: actor.id,
+  })
+  if (error) return adminRoleError(error)
+
+  const { data: target } = await supabase
+    .from('profiles')
+    .select('display_name')
+    .eq('id', userId)
+    .single()
+  const name = target?.display_name ?? 'They'
+
+  revalidatePath('/admin')
+  if (!appointed) return { ok: true, message: `${name} is already an admin.` }
+
+  const email = await emailNewAdmin(supabase, userId, name, actor.display_name)
+  const emailNote =
+    email === 'sent' ? " We've emailed them." :
+    email === 'skipped' ? " (Email isn't set up, so they weren't emailed.)" :
+    " The email to them didn't go through, so let them know yourself."
+  return { ok: true, message: `${name} is now an admin.${emailNote}` }
+}
+
+export async function removeAdmin(userId: string): Promise<AdminRoleResult> {
+  const actor = await adminRoleActor()
+  if ('ok' in actor) return actor
+  if (typeof userId !== 'string' || !userId) return { ok: false, error: 'Member not found.' }
+
+  const supabase = await adminDb()
+  const { data: removed, error } = await supabase.rpc('revoke_admin', {
+    p_target: userId,
+    p_actor: actor.id,
+  })
+  if (error) return adminRoleError(error)
+
+  revalidatePath('/admin')
+  if (userId === actor.id) return { ok: true, message: "You're no longer an admin." }
+  return { ok: true, message: removed ? 'Admin removed.' : "They weren't an admin." }
+}
+
+async function emailNewAdmin(
+  supabase: ReturnType<typeof createAdminClient>,
+  userId: string,
+  name: string,
+  appointedBy: string
+) {
+  const { data, error } = await supabase.auth.admin.getUserById(userId)
+  const to = data?.user?.email
+  if (error || !to) {
+    console.error('New admin email: no address for', userId, error)
+    return 'failed' as const
+  }
+
+  // The site this was done on (production, a preview or local dev)
+  const origin = (await headers()).get('origin') || 'https://truemotu.org'
+  const link = `${origin}/admin`
+
+  return sendEmail({
+    to,
+    subject: "You're now an admin of True Motu Dictionary",
+    text:
+      `Hi ${name},
+
+` +
+      `You've been made an admin of True Motu Dictionary by ${appointedBy}.
+
+` +
+      `Admins look after the dictionary for the community: they can verify and unflag words, ` +
+      `warn, suspend and ban members, and appoint other admins.
+
+` +
+      `Open the admin page: ${link}
+`,
+    html:
+      `<p>Hi ${escapeHtml(name)},</p>` +
+      `<p>You've been made an admin of True Motu Dictionary by ${escapeHtml(appointedBy)}.</p>` +
+      `<p>Admins look after the dictionary for the community: they can verify and unflag words, ` +
+      `warn, suspend and ban members, and appoint other admins.</p>` +
+      `<p><a href="${escapeHtml(link)}">Open the admin page</a></p>`,
+  })
 }
 
 // Consensus backfill
