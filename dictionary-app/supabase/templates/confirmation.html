@@ -26,12 +26,12 @@
             <table role="presentation" cellpadding="0" cellspacing="0" style="margin:24px 0;">
               <tr>
                 <td style="border-radius:8px;background:#2563eb;">
-                  <a href="{{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&type=signup" style="display:inline-block;padding:12px 24px;color:#ffffff;font-size:16px;font-weight:600;text-decoration:none;border-radius:8px;">Confirm my email</a>
+                  <a href="{{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&type=email" style="display:inline-block;padding:12px 24px;color:#ffffff;font-size:16px;font-weight:600;text-decoration:none;border-radius:8px;">Confirm my email</a>
                 </td>
               </tr>
             </table>
             <p style="margin:0 0 8px 0;font-size:14px;color:#6b7280;">If the button doesn't work, copy this address into your browser:</p>
-            <p style="margin:0;font-size:13px;word-break:break-all;"><a href="{{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&type=signup" style="color:#2563eb;">{{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&type=signup</a></p>
+            <p style="margin:0;font-size:13px;word-break:break-all;"><a href="{{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&type=email" style="color:#2563eb;">{{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&type=email</a></p>
           </td>
         </tr>
         <tr>

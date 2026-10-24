@@ -17,6 +17,8 @@ Deliverability notes (why these look the way they do):
 - Signup, recovery and magic-link use the token_hash link to /auth/callback,
   which the callback route verifies with verifyOtp. Unlike the PKCE code flow,
   it works when the email is opened on a different device or browser.
+  Signup uses type=email (not type=signup): that is what production used when
+  the confirmation flow was verified end to end in August 2026.
 """
 
 from pathlib import Path
@@ -103,7 +105,7 @@ TEMPLATES = {
             "Thanks for joining the True Motu Dictionary. You signed up with <strong>{{ .Email }}</strong>.",
             "Confirm your email address to finish creating your account and start contributing translations.",
         ],
-        link("signup"),
+        link("email"),
         "Confirm my email",
         "This link works once and expires in 1 hour. If you didn't sign up for True Motu Dictionary, "
         "you can safely ignore this email; no account will be created.",
