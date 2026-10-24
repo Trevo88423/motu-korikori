@@ -58,7 +58,8 @@ export default function WordCard({ word, userContribution, allContributions, com
     const grouped = new Map<string, ContributionWithProfile[]>()
 
     allContributions.forEach(contrib => {
-      if (!contrib.is_excluded) {
+      // A translation hidden by flags doesn't count (only its author sees it)
+      if (!contrib.is_excluded && !contrib.is_hidden) {
         const existing = grouped.get(contrib.english_gloss) || []
         grouped.set(contrib.english_gloss, [...existing, contrib])
       }
@@ -344,6 +345,15 @@ export default function WordCard({ word, userContribution, allContributions, com
               onAgree={handleAgree}
               currentUserId={currentUserId}
             />
+            {/* Translations are grouped here; each one can be flagged on the word page */}
+            {allContributions.some((c) => c.user_id !== currentUserId) && (
+              <a
+                href={`/dictionary/${word.id}#translations`}
+                className="inline-block mt-3 py-1 text-xs text-gray-500 hover:text-red-600"
+              >
+                🚩 Offensive or junk translation here? Flag it on the word page
+              </a>
+            )}
           </div>
         )}
 

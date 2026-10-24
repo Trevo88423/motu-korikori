@@ -1,7 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { addComment, updateComment, deleteComment, flagComment, voteOnComment } from '@/app/contribute/comment-actions'
+import { addComment, updateComment, deleteComment, voteOnComment } from '@/app/contribute/comment-actions'
+import FlagButton from './FlagButton'
 import type { CommentWithProfile } from '@/lib/types'
 
 interface CommentSectionProps {
@@ -68,14 +69,6 @@ export default function CommentSection({ wordId, comments, userComment, currentU
       await voteOnComment({ target_id: commentId, vote_type: voteType }, wordId)
     } catch (err: any) {
       setError(err.message || 'Failed to vote')
-    }
-  }
-
-  const handleFlag = async (commentId: string) => {
-    try {
-      await flagComment(commentId, wordId)
-    } catch (err: any) {
-      setError(err.message || 'Failed to flag comment')
     }
   }
 
@@ -251,6 +244,14 @@ export default function CommentSection({ wordId, comments, userComment, currentU
                           <span className="text-primary-600 font-medium">Your comment</span>
                         </>
                       )}
+                      {comment.is_flagged && (
+                        <>
+                          <span className="hidden sm:inline">•</span>
+                          <span className="px-2 py-0.5 bg-amber-100 text-amber-800 rounded">
+                            Hidden after flags, waiting for review
+                          </span>
+                        </>
+                      )}
                     </div>
                   </div>
 
@@ -289,12 +290,7 @@ export default function CommentSection({ wordId, comments, userComment, currentU
                 {/* Flag button */}
                 {!isOwnComment && currentUserId && (
                   <div className="mt-2 pt-2 border-t border-gray-200">
-                    <button
-                      onClick={() => handleFlag(comment.id)}
-                      className="text-xs text-gray-500 hover:text-red-600 transition"
-                    >
-                      🚩 Flag as irrelevant
-                    </button>
+                    <FlagButton kind="comment" targetId={comment.id} />
                   </div>
                 )}
               </div>

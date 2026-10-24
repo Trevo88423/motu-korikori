@@ -311,3 +311,97 @@ export async function recalculateConsensusForAllWords(): Promise<RecalculateCons
     return { ok: false, error: 'Recalculation failed. Check the server logs.' }
   }
 }
+
+// Items hidden by flags (#56)
+
+type FlagDecision = 'restore' | 'confirm'
+
+async function resolveHidden(formData: FormData, decision: FlagDecision) {
+  const admin = await requireAdmin()
+  const kind = formData.get('kind') as string
+  const targetId = formData.get('targetId') as string
+
+  if (kind !== 'contribution' && kind !== 'comment') {
+    throw new Error('Unknown item')
+  }
+
+  const supabase = await adminDb()
+
+  // Restoring overturns the pending flags, which lowers each flagger's future
+  // flag weight (flag_weight() in the database); confirming upholds them.
+  const { data, error } = await supabase.rpc('resolve_flags', {
+    target_kind: kind,
+    target_id: targetId,
+    decision,
+  })
+
+  if (error) {
+    console.error('Error resolving flags:', error)
+    throw new Error('Could not update the item. It may already have been decided.')
+  }
+
+  const result = data as { author_id: string; word_id: string; summary: string; flaggers: number }
+  const label = kind === 'contribution' ? 'translation' : 'comment'
+  const flaggers = `${result.flaggers} ${result.flaggers === 1 ? 'flag' : 'flags'}`
+
+  await supabase
+    .from('moderation_log')
+    .insert({
+      admin_id: admin.id,
+      target_user_id: result.author_id,
+      target_word_id: result.word_id,
+      target_kind: kind,
+      target_id: targetId,
+      action: decision === 'restore' ? 'restore_content' : 'confirm_hide',
+      reason: decision === 'restore'
+        ? `Restored ${label} "${result.summary}" (${flaggers} overturned)`
+        : `Kept ${label} "${result.summary}" hidden (${flaggers} upheld)`,
+    })
+
+  // A restored translation counts towards consensus again
+  if (kind === 'contribution' && decision === 'restore') {
+    await calculateConsensus(result.word_id)
+  }
+
+  revalidatePath('/admin')
+  revalidatePath(`/dictionary/${result.word_id}`)
+}
+
+export async function restoreHidden(formData: FormData) {
+  await resolveHidden(formData, 'restore')
+}
+
+export async function confirmHidden(formData: FormData) {
+  await resolveHidden(formData, 'confirm')
+}
+
+const MODERATION_SETTING_KEYS = [
+  'flag_hide_threshold',
+  'flag_weight_member',
+  'flag_weight_trusted',
+  'flag_trusted_min_trust',
+  'flag_overturn_penalty',
+]
+
+export async function updateModerationSetting(formData: FormData) {
+  await requireAdmin()
+  const key = formData.get('key') as string
+  const value = Number(formData.get('value'))
+
+  if (!MODERATION_SETTING_KEYS.includes(key) || !Number.isFinite(value) || value < 0 || value > 100) {
+    throw new Error('Invalid setting')
+  }
+
+  const supabase = await adminDb()
+  const { error } = await supabase
+    .from('moderation_settings')
+    .update({ value, updated_at: new Date().toISOString() })
+    .eq('key', key)
+
+  if (error) {
+    console.error('Error updating moderation setting:', error)
+    throw new Error('Could not save the setting')
+  }
+
+  revalidatePath('/admin')
+}

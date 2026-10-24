@@ -212,6 +212,7 @@ async function recalculateWord(wordId: string): Promise<{ changed: boolean } | n
         english_gloss,
         audio_url,
         is_excluded,
+        is_hidden,
         user_id,
         agreement_type,
         matches_consensus,
@@ -224,7 +225,12 @@ async function recalculateWord(wordId: string): Promise<{ changed: boolean } | n
       return null
     }
 
-    const rows = (contributions || []) as any[]
+    // A translation hidden by flags (#56) counts exactly like an excluded one:
+    // it's left out of the groups and never matches consensus.
+    const rows = ((contributions || []) as any[]).map((c) => ({
+      ...c,
+      is_excluded: c.is_excluded || c.is_hidden,
+    }))
 
     // Group and analyze contributions
     const groups = groupContributions(rows)

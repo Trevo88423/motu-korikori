@@ -147,6 +147,14 @@ export default async function MyContributionsPage() {
                     )}
                     <span>•</span>
                     <span className="capitalize">{contribution.confidence.replace('_', ' ')}</span>
+                    {contribution.is_hidden && (
+                      <>
+                        <span>•</span>
+                        <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-800">
+                          Hidden after flags, waiting for review
+                        </span>
+                      </>
+                    )}
                   </div>
                   {comment && (
                     <div className="mt-2 pt-2 border-t border-gray-200">
