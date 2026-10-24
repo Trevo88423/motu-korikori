@@ -45,19 +45,19 @@ export default async function RootLayout({
     data: { user },
   } = await supabase.auth.getUser()
 
-  // Get user profile for name
+  // Get user profile for the display name shown in the nav
   let userData = null
   if (user) {
     const { data: profile } = await supabase
       .from('profiles')
-      .select('name')
+      .select('display_name')
       .eq('id', user.id)
       .single()
 
     userData = {
       id: user.id,
       email: user.email || '',
-      name: profile?.name,
+      name: profile?.display_name,
     }
   }
 

@@ -1,16 +1,12 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { createAdminClient, getCurrentUserProfile, isUserAdmin } from '@/lib/supabase'
+import { createAdminClient } from '@/lib/supabase'
+import { requireActiveUserForAction, AccessDeniedError } from '@/lib/auth'
 import { calculateConsensus, recalculateAllConsensus } from '@/lib/consensus'
 
 async function requireAdmin() {
-  const profile = await getCurrentUserProfile()
-
-  if (!profile || !profile.is_admin) {
-    throw new Error('Unauthorized: Admin access required')
-  }
-
+  const { profile } = await requireActiveUserForAction({ requireAdmin: true })
   return profile
 }
 
@@ -20,6 +16,30 @@ async function requireAdmin() {
 // Authorisation is enforced by requireAdmin() above, which every action calls first.
 async function adminDb() {
   return createAdminClient()
+}
+
+// profiles.status is what the app checks on every request; this mirrors it
+// into Supabase Auth so a suspended or banned member can't sign in or refresh
+// a session either, and ends the sessions they have. 'none' undoes the block.
+async function setSignInBlocked(
+  supabase: ReturnType<typeof createAdminClient>,
+  userId: string,
+  blocked: boolean
+) {
+  const { error } = await supabase.auth.admin.updateUserById(userId, {
+    ban_duration: blocked ? '876000h' : 'none',
+  })
+  if (error) {
+    console.error('Error updating sign-in block:', error)
+    throw new Error('Status saved, but sign-in could not be updated. Try again.')
+  }
+
+  if (blocked) {
+    // The block above already refuses their tokens, so a failure here is logged
+    // rather than fatal.
+    const { error: revokeError } = await supabase.rpc('revoke_user_sessions', { target_user_id: userId })
+    if (revokeError) console.error('Error revoking sessions:', revokeError)
+  }
 }
 
 // Word Moderation Actions
@@ -114,6 +134,8 @@ export async function warnUser(formData: FormData) {
     .update({ status: 'warned' })
     .eq('id', userId)
 
+  await setSignInBlocked(supabase, userId, false)
+
   await supabase
     .from('moderation_log')
     .insert({
@@ -136,6 +158,8 @@ export async function suspendUser(formData: FormData) {
     .from('profiles')
     .update({ status: 'suspended' })
     .eq('id', userId)
+
+  await setSignInBlocked(supabase, userId, true)
 
   await supabase
     .from('moderation_log')
@@ -160,6 +184,8 @@ export async function banUser(formData: FormData) {
     .update({ status: 'banned' })
     .eq('id', userId)
 
+  await setSignInBlocked(supabase, userId, true)
+
   await supabase
     .from('moderation_log')
     .insert({
@@ -167,6 +193,31 @@ export async function banUser(formData: FormData) {
       target_user_id: userId,
       action: 'ban',
       reason: 'User banned by admin',
+    })
+
+  revalidatePath('/admin')
+}
+
+export async function reinstateUser(formData: FormData) {
+  const admin = await requireAdmin()
+  const userId = formData.get('userId') as string
+
+  const supabase = await adminDb()
+
+  await supabase
+    .from('profiles')
+    .update({ status: 'active' })
+    .eq('id', userId)
+
+  await setSignInBlocked(supabase, userId, false)
+
+  await supabase
+    .from('moderation_log')
+    .insert({
+      admin_id: admin.id,
+      target_user_id: userId,
+      action: 'reinstate',
+      reason: 'User reinstated by admin',
     })
 
   revalidatePath('/admin')
@@ -239,10 +290,13 @@ export type RecalculateConsensusResult =
   | { ok: false; error: string }
 
 export async function recalculateConsensusForAllWords(): Promise<RecalculateConsensusResult> {
-  // Checked server-side through is_current_user_admin(); the service-role
-  // writes below are only reachable by an admin session
-  if (!(await isUserAdmin())) {
-    return { ok: false, error: 'Unauthorized: Admin access required' }
+  // Same server-side check as every admin action (active, verified admin);
+  // the service-role writes below are only reachable by an admin session
+  try {
+    await requireAdmin()
+  } catch (error) {
+    if (error instanceof AccessDeniedError) return { ok: false, error: error.message }
+    throw error
   }
 
   try {

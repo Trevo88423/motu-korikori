@@ -1,5 +1,5 @@
-import { redirect } from 'next/navigation'
-import { createServerComponentClient, getCurrentUserProfile, getTotalWordCount } from '@/lib/supabase'
+import { createServerComponentClient, getTotalWordCount } from '@/lib/supabase'
+import { requireActiveUser } from '@/lib/auth'
 import ContributeClient from '@/components/ContributeClient'
 import { saveContribution } from './actions'
 import { markWordComplete } from './completion-actions'
@@ -28,49 +28,33 @@ export default async function ContributePage({
   searchParams: Promise<SearchParams>
 }) {
   const params = await searchParams
-  const supabase = await createServerComponentClient()
-  const profile = await getCurrentUserProfile()
-  const totalWords = await getTotalWordCount()
 
-  if (!profile) {
-    redirect('/login')
-  }
+  // The word loads alongside the access check. It's a read, and it's only used
+  // once requireActiveUser lets the member through: its redirect rejects the
+  // whole Promise.all for everyone else.
+  const wordsClient = await createServerComponentClient()
 
-  // Check if user is suspended/banned
-  if (profile.status === 'suspended' || profile.status === 'banned') {
-    return (
-      <div className="max-w-2xl mx-auto px-4 py-16 text-center">
-        <h1 className="text-3xl font-bold text-red-600 mb-4">
-          Account {profile.status === 'suspended' ? 'Suspended' : 'Banned'}
-        </h1>
-        <p className="text-gray-600">
-          Your account has been {profile.status}. Please contact support for more information.
-        </p>
-      </div>
-    )
-  }
-
-  // Get next word for user - either specific word or next in sequence
-  let words
-  let wordsError
-
-  if (params.word) {
-    // Get specific word by ID
-    const result = await supabase
-      .from('words')
-      .select('*')
-      .eq('id', params.word)
-      .single()
-    words = result.data ? [result.data] : null
-    wordsError = result.error
-  } else {
-    // Get next word for the signed-in user (the function uses auth.uid()),
-    // leaving out words they skipped recently
-    const result = await supabase
+  // Either a specific word by ID, or the next word for the signed-in user (the
+  // function uses auth.uid()), leaving out words they skipped recently
+  const loadWords = async () => {
+    if (params.word) {
+      const result = await wordsClient
+        .from('words')
+        .select('*')
+        .eq('id', params.word)
+        .single()
+      return { words: result.data ? [result.data] : null, wordsError: result.error }
+    }
+    const result = await wordsClient
       .rpc('get_next_word_for_user', { exclude_ids: parseSkipped(params.skip) })
-    words = result.data
-    wordsError = result.error
+    return { words: result.data, wordsError: result.error }
   }
+
+  const [{ supabase, profile }, totalWords, { words, wordsError }] = await Promise.all([
+    requireActiveUser(),
+    getTotalWordCount(),
+    loadWords(),
+  ])
 
   if (wordsError) {
     console.error('Error fetching next word:', wordsError)
@@ -108,48 +92,53 @@ export default async function ContributePage({
 
   const word = words[0] as Word
 
-  // Check if user already contributed to this word
-  // Use maybeSingle() to handle case where contribution was deleted
-  const { data: userContribution } = await supabase
-    .from('contributions')
-    .select('*')
-    .eq('word_id', word.id)
-    .eq('user_id', profile.id)
-    .maybeSingle()
+  const [
+    // Has the user already contributed to this word?
+    // maybeSingle() handles the case where the contribution was deleted
+    { data: userContribution },
+    // All contributions for this word (for consensus display)
+    { data: allContributions },
+    { data: comments },
+  ] = await Promise.all([
+    supabase
+      .from('contributions')
+      .select('*')
+      .eq('word_id', word.id)
+      .eq('user_id', profile.id)
+      .maybeSingle(),
+    supabase
+      .from('contributions')
+      .select(`
+        *,
+        profile:profiles(display_name, connection_type, trust_score)
+      `)
+      .eq('word_id', word.id)
+      .order('created_at', { ascending: false }),
+    supabase
+      .from('comments')
+      .select(`
+        *,
+        profile:profiles(display_name, connection_type, trust_score)
+      `)
+      .eq('word_id', word.id)
+      .order('net_votes', { ascending: false }),
+  ])
 
-  // Get all contributions for this word (for consensus display)
-  const { data: allContributions } = await supabase
-    .from('contributions')
-    .select(`
-      *,
-      profile:profiles(name, connection_type, trust_score)
-    `)
-    .eq('word_id', word.id)
-    .order('created_at', { ascending: false })
-
-  // Get comments for this word
-  const { data: comments } = await supabase
-    .from('comments')
-    .select(`
-      *,
-      profile:profiles(name, connection_type, trust_score)
-    `)
-    .eq('word_id', word.id)
-    .order('net_votes', { ascending: false })
-
-  // Get user's vote on each comment
-  const commentsWithVotes = comments ? await Promise.all(
-    comments.map(async (comment) => {
-      const { data: vote } = await supabase
+  // The user's votes on those comments, in one query
+  const commentIds = (comments || []).map((c) => c.id)
+  const { data: votes } = commentIds.length > 0
+    ? await supabase
         .from('comment_votes')
-        .select('vote_type')
-        .eq('comment_id', comment.id)
+        .select('comment_id, vote_type')
         .eq('user_id', profile.id)
-        .single()
+        .in('comment_id', commentIds)
+    : { data: [] as { comment_id: string; vote_type: string }[] }
 
-      return { ...comment, user_vote: vote?.vote_type || null }
-    })
-  ) : []
+  const voteByComment = new Map((votes || []).map((v) => [v.comment_id, v.vote_type]))
+  const commentsWithVotes = (comments || []).map((comment) => ({
+    ...comment,
+    user_vote: voteByComment.get(comment.id) || null,
+  }))
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">

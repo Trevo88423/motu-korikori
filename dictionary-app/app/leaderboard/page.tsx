@@ -9,7 +9,7 @@ export default async function LeaderboardPage() {
   // Get top contributors
   const { data: topContributors } = await supabase
     .from('profiles')
-    .select('id, name, contribution_count, connection_type, trust_score, status')
+    .select('id, display_name, contribution_count, connection_type, trust_score, status')
     .gt('contribution_count', 0)
     .neq('status', 'banned')
     .order('contribution_count', { ascending: false })
@@ -116,7 +116,7 @@ export default async function LeaderboardPage() {
                     </td>
                     <td className="py-2 sm:py-3 px-2 sm:px-4">
                       <div className="font-medium text-gray-900 text-sm sm:text-base truncate max-w-[120px] sm:max-w-none">
-                        {contributor.name}
+                        {contributor.display_name}
                         {isCurrentUser && (
                           <span className="ml-1 sm:ml-2 text-xs text-primary-600 font-normal">(You)</span>
                         )}

@@ -1,21 +1,14 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { createServerComponentClient } from '@/lib/supabase'
+import { requireActiveUserForAction } from '@/lib/auth'
 
 /**
  * Mark a word as complete for the current user
  * This means "I'm done with this word, don't show it to me again"
  */
 export async function markWordComplete(wordId: string) {
-  const supabase = await createServerComponentClient()
-
-  // Get current user
-  const { data: { user } } = await supabase.auth.getUser()
-
-  if (!user) {
-    throw new Error('Not authenticated')
-  }
+  const { supabase, user } = await requireActiveUserForAction()
 
   // Insert completion record (or update if exists)
   const { error } = await supabase

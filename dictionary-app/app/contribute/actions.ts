@@ -1,7 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { createServerComponentClient } from '@/lib/supabase'
+import { requireActiveUserForAction } from '@/lib/auth'
 import { calculateConsensus } from '@/lib/consensus'
 import type { ContributionFormData } from '@/lib/types'
 
@@ -10,25 +10,7 @@ import type { ContributionFormData } from '@/lib/types'
 // RLS) has succeeded, and the result is derived purely from stored rows.
 
 export async function agreeWithTranslation(wordId: string, englishGloss: string) {
-  const supabase = await createServerComponentClient()
-
-  // Get current user
-  const { data: { user } } = await supabase.auth.getUser()
-
-  if (!user) {
-    throw new Error('Not authenticated')
-  }
-
-  // Check user status
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('status')
-    .eq('id', user.id)
-    .single()
-
-  if (profile?.status === 'suspended' || profile?.status === 'banned') {
-    throw new Error('Your account has been suspended')
-  }
+  const { supabase, user } = await requireActiveUserForAction()
 
   // Check if user already contributed to this word
   const { data: existing } = await supabase
@@ -103,25 +85,7 @@ export async function agreeWithTranslation(wordId: string, englishGloss: string)
 }
 
 export async function saveContribution(data: ContributionFormData) {
-  const supabase = await createServerComponentClient()
-
-  // Get current user
-  const { data: { user } } = await supabase.auth.getUser()
-
-  if (!user) {
-    throw new Error('Not authenticated')
-  }
-
-  // Check user status
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('status')
-    .eq('id', user.id)
-    .single()
-
-  if (profile?.status === 'suspended' || profile?.status === 'banned') {
-    throw new Error('Your account has been suspended')
-  }
+  const { supabase, user } = await requireActiveUserForAction()
 
   // Check if user already has a contribution for this word
   const { data: existing } = await supabase

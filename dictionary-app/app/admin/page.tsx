@@ -1,7 +1,6 @@
-import { redirect } from 'next/navigation'
-import { createServerComponentClient, getCurrentUserProfile, isUserAdmin } from '@/lib/supabase'
+import { requireActiveUser } from '@/lib/auth'
 import Link from 'next/link'
-import { verifyWord, flagWord, unflagWord, warnUser, suspendUser, banUser, excludeFromAI, excludeAllContributions } from './actions'
+import { verifyWord, flagWord, unflagWord, warnUser, suspendUser, banUser, reinstateUser, excludeFromAI, excludeAllContributions } from './actions'
 import RecalculateConsensusButton from './RecalculateConsensusButton'
 
 export const dynamic = 'force-dynamic'
@@ -9,17 +8,7 @@ export const dynamic = 'force-dynamic'
 export const maxDuration = 300
 
 export default async function AdminPage() {
-  const profile = await getCurrentUserProfile()
-
-  if (!profile) {
-    redirect('/login')
-  }
-
-  if (!profile.is_admin) {
-    redirect('/')
-  }
-
-  const supabase = await createServerComponentClient()
+  const { supabase } = await requireActiveUser({ requireAdmin: true })
 
   // Fetch flagged words
   const { data: flaggedWords } = await supabase
@@ -32,18 +21,26 @@ export default async function AdminPage() {
   // Fetch low trust users
   const { data: lowTrustUsers } = await supabase
     .from('profiles')
-    .select('id, name, connection_type, trust_score, contribution_count, status')
+    .select('id, display_name, connection_type, trust_score, contribution_count, status')
     .lt('trust_score', 0.7)
     .order('trust_score', { ascending: true })
     .limit(20)
+
+  // Suspended and banned members, so they can be reinstated
+  const { data: inactiveUsers } = await supabase
+    .from('profiles')
+    .select('id, display_name, connection_type, status')
+    .in('status', ['suspended', 'banned'])
+    .order('display_name', { ascending: true })
+    .limit(50)
 
   // Fetch recent moderation log
   const { data: moderationLog } = await supabase
     .from('moderation_log')
     .select(`
       *,
-      admin:profiles!moderation_log_admin_id_fkey(name),
-      target_user:profiles!moderation_log_target_user_id_fkey(name),
+      admin:profiles!moderation_log_admin_id_fkey(display_name),
+      target_user:profiles!moderation_log_target_user_id_fkey(display_name),
       target_word:words(motu_word)
     `)
     .order('created_at', { ascending: false })
@@ -65,6 +62,9 @@ export default async function AdminPage() {
             </a>
             <a href="#low-trust" className="border-transparent py-4 px-1 text-sm font-medium text-gray-500 hover:text-gray-700 hover:border-gray-300">
               Low Trust Users
+            </a>
+            <a href="#inactive-users" className="border-transparent py-4 px-1 text-sm font-medium text-gray-500 hover:text-gray-700 hover:border-gray-300">
+              Suspended and Banned
             </a>
             <a href="#moderation-log" className="border-transparent py-4 px-1 text-sm font-medium text-gray-500 hover:text-gray-700 hover:border-gray-300">
               Moderation Log
@@ -149,7 +149,7 @@ export default async function AdminPage() {
                 <div key={user.id} className="p-4 bg-gray-50 border border-gray-200 rounded-lg">
                   <div className="flex items-start justify-between mb-4">
                     <div>
-                      <h3 className="font-bold text-gray-900">{user.name}</h3>
+                      <h3 className="font-bold text-gray-900">{user.display_name}</h3>
                       <p className="text-sm text-gray-600 mt-1">
                         Trust Score: {user.trust_score.toFixed(2)} •
                         Status: {user.status} •
@@ -202,6 +202,36 @@ export default async function AdminPage() {
         </div>
       </div>
 
+      {/* Suspended and Banned Section */}
+      <div id="inactive-users" className="mb-12">
+        <div className="card">
+          <h2 className="text-xl font-bold text-gray-900 mb-6">
+            Suspended and Banned ({inactiveUsers?.length || 0})
+          </h2>
+
+          {inactiveUsers && inactiveUsers.length > 0 ? (
+            <div className="space-y-4">
+              {inactiveUsers.map((user: any) => (
+                <div key={user.id} className="p-4 bg-red-50 border border-red-200 rounded-lg flex items-center justify-between">
+                  <div>
+                    <h3 className="font-bold text-gray-900">{user.display_name}</h3>
+                    <p className="text-sm text-gray-600 mt-1">Status: {user.status}</p>
+                  </div>
+                  <form action={reinstateUser}>
+                    <input type="hidden" name="userId" value={user.id} />
+                    <button type="submit" className="btn btn-ghost text-sm">
+                      Reinstate
+                    </button>
+                  </form>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-gray-500 text-center py-8">No suspended or banned members</p>
+          )}
+        </div>
+      </div>
+
       {/* Moderation Log Section */}
       <div id="moderation-log">
         <div className="card">
@@ -215,13 +245,13 @@ export default async function AdminPage() {
                 <div key={log.id} className="p-3 bg-gray-50 rounded-lg text-sm">
                   <div className="flex items-start justify-between">
                     <div>
-                      <span className="font-medium">{log.admin.name}</span>
+                      <span className="font-medium">{log.admin.display_name}</span>
                       <span className="text-gray-600"> performed </span>
                       <span className="font-medium text-primary-600">{log.action.replace('_', ' ')}</span>
                       {log.target_user && (
                         <>
                           <span className="text-gray-600"> on user </span>
-                          <span className="font-medium">{log.target_user.name}</span>
+                          <span className="font-medium">{log.target_user.display_name}</span>
                         </>
                       )}
                       {log.target_word && (
