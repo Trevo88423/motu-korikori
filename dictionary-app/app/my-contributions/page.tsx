@@ -1,17 +1,12 @@
-import { redirect } from 'next/navigation'
-import { createServerComponentClient, getCurrentUserProfile, getTotalWordCount } from '@/lib/supabase'
+import { getTotalWordCount } from '@/lib/supabase'
+import { requireActiveUser } from '@/lib/auth'
 import Link from 'next/link'
 
 export const dynamic = 'force-dynamic'
 
 export default async function MyContributionsPage() {
-  const supabase = await createServerComponentClient()
-  const profile = await getCurrentUserProfile()
+  const { supabase, profile } = await requireActiveUser()
   const totalWords = await getTotalWordCount()
-
-  if (!profile) {
-    redirect('/login')
-  }
 
   // Get user's contributions with word details
   const { data: contributions } = await supabase

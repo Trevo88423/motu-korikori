@@ -1,5 +1,8 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
+import { isInactiveStatus } from '@/lib/auth'
+
+const ACCOUNT_INACTIVE = 'This account has been suspended or banned. If you think this is a mistake, please contact the Truemotu team.'
 
 export async function POST(req: NextRequest) {
   const { email, password } = await req.json()
@@ -26,6 +29,12 @@ export async function POST(req: NextRequest) {
 
   const { data, error } = await supabase.auth.signInWithPassword({ email, password })
 
+  // Suspended and banned members are blocked in Supabase Auth too (see
+  // setSignInBlocked in app/admin/actions.ts).
+  if (error?.code === 'user_banned') {
+    return NextResponse.json({ ok: false, error: ACCOUNT_INACTIVE }, { status: 403 })
+  }
+
   if (error || !data.session) {
     // Handle email not confirmed error
     if (error?.message?.toLowerCase().includes('email not confirmed')) {
@@ -37,15 +46,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: error?.message ?? 'No session' }, { status: 401 })
   }
 
-  // Check if user is banned
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('status')
-    .eq('id', data.user.id)
-    .single()
+  // profiles.status is the source of truth, so check it even if the Auth
+  // block above is missing (e.g. members banned before it existed).
+  const { data: profile } = await supabase.rpc('get_my_profile')
 
-  if (profile?.status === 'banned') {
-    return NextResponse.json({ ok: false, error: 'Account suspended' }, { status: 403 })
+  if (isInactiveStatus(profile?.status)) {
+    await supabase.auth.signOut()
+    return NextResponse.json({ ok: false, error: ACCOUNT_INACTIVE }, { status: 403 })
   }
 
   return response
