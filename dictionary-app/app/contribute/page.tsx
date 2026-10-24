@@ -1,5 +1,5 @@
-import { redirect } from 'next/navigation'
-import { createServerComponentClient, getCurrentUserProfile, getTotalWordCount } from '@/lib/supabase'
+import { getTotalWordCount } from '@/lib/supabase'
+import { requireActiveUser } from '@/lib/auth'
 import ContributeClient from '@/components/ContributeClient'
 import { saveContribution } from './actions'
 import { markWordComplete } from './completion-actions'
@@ -28,27 +28,8 @@ export default async function ContributePage({
   searchParams: Promise<SearchParams>
 }) {
   const params = await searchParams
-  const supabase = await createServerComponentClient()
-  const profile = await getCurrentUserProfile()
+  const { supabase, profile } = await requireActiveUser()
   const totalWords = await getTotalWordCount()
-
-  if (!profile) {
-    redirect('/login')
-  }
-
-  // Check if user is suspended/banned
-  if (profile.status === 'suspended' || profile.status === 'banned') {
-    return (
-      <div className="max-w-2xl mx-auto px-4 py-16 text-center">
-        <h1 className="text-3xl font-bold text-red-600 mb-4">
-          Account {profile.status === 'suspended' ? 'Suspended' : 'Banned'}
-        </h1>
-        <p className="text-gray-600">
-          Your account has been {profile.status}. Please contact support for more information.
-        </p>
-      </div>
-    )
-  }
 
   // Get next word for user - either specific word or next in sequence
   let words
