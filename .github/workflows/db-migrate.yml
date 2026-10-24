@@ -22,6 +22,12 @@ name: Apply Supabase migrations
 # Production records 20260801051846_remote_schema (the baseline dump),
 # 20260803084707_lock_down_profile_updates and 20260803084739_atomic_signup.
 # Never rename an applied migration; create new ones with `npm run db:new`.
+#
+# ORDER NOTE: pushes use --include-all, so a migration whose version is OLDER
+# than the newest one already applied still runs, as long as it hasn't been
+# applied yet. Several sessions build in parallel and merge in any order;
+# without this, db push refused the later-merged, earlier-versioned file.
+# Versions must still be unique.
 # schema.sql and migration-voting-system.sql are historical and are NOT in
 # migrations/ — they are already applied and must not be replayed.
 
@@ -62,7 +68,7 @@ jobs:
         run: supabase migration list --db-url "$DB_URL"
 
       - name: Apply migrations
-        run: supabase db push --db-url "$DB_URL"
+        run: supabase db push --include-all --db-url "$DB_URL"
 
       - name: Confirm nothing left pending
-        run: supabase db push --dry-run --db-url "$DB_URL"
+        run: supabase db push --include-all --dry-run --db-url "$DB_URL"
