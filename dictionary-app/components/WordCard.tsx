@@ -338,6 +338,7 @@ export default function WordCard({ word, userContribution, allContributions, com
           <div className="border-t pt-8 mb-8">
             <ConsensusBar
               contributions={contributionGroups}
+              status={word.status}
               currentConsensus={word.consensus_gloss}
               wordId={word.id}
               onAgree={handleAgree}

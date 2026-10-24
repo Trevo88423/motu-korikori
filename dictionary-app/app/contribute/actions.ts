@@ -2,7 +2,12 @@
 
 import { revalidatePath } from 'next/cache'
 import { createServerComponentClient } from '@/lib/supabase'
+import { calculateConsensus } from '@/lib/consensus'
 import type { ContributionFormData } from '@/lib/types'
+
+// calculateConsensus() writes with the service-role client. Each action below
+// only calls it after the signed-in member's own contribution write (checked by
+// RLS) has succeeded, and the result is derived purely from stored rows.
 
 export async function agreeWithTranslation(wordId: string, englishGloss: string) {
   const supabase = await createServerComponentClient()
@@ -46,6 +51,8 @@ export async function agreeWithTranslation(wordId: string, englishGloss: string)
         throw new Error('Failed to remove agreement')
       }
 
+      await calculateConsensus(wordId)
+
       // Force revalidation of both paths
       revalidatePath('/contribute', 'page')
       revalidatePath(`/contribute?word=${wordId}`, 'page')
@@ -87,6 +94,8 @@ export async function agreeWithTranslation(wordId: string, englishGloss: string)
       throw new Error('Failed to add agreement')
     }
   }
+
+  await calculateConsensus(wordId)
 
   // Revalidate the contribute page to show updated consensus
   revalidatePath('/contribute')
@@ -146,6 +155,8 @@ export async function saveContribution(data: ContributionFormData) {
     console.error('Error saving contribution:', error)
     throw new Error('Failed to save contribution')
   }
+
+  await calculateConsensus(data.word_id)
 
   // Revalidate the contribute page to show next word
   revalidatePath('/contribute')

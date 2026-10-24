@@ -248,6 +248,7 @@ export default async function WordDetailPage({
           <div className="mb-8">
             <ConsensusBar
               contributions={contributionGroups}
+              status={word.status}
               currentConsensus={word.consensus_gloss}
             />
           </div>

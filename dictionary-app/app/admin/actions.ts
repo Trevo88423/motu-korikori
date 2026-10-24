@@ -1,7 +1,8 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { createAdminClient, getCurrentUserProfile } from '@/lib/supabase'
+import { createAdminClient, getCurrentUserProfile, isUserAdmin } from '@/lib/supabase'
+import { calculateConsensus, recalculateAllConsensus } from '@/lib/consensus'
 
 async function requireAdmin() {
   const profile = await getCurrentUserProfile()
@@ -34,6 +35,9 @@ export async function verifyWord(formData: FormData) {
     .from('words')
     .update({ status: 'verified' })
     .eq('id', wordId)
+
+  // Fill in the gloss from the leading contribution (status stays verified)
+  await calculateConsensus(wordId)
 
   // Log action
   await supabase
@@ -198,10 +202,11 @@ export async function excludeAllContributions(formData: FormData) {
   const supabase = await adminDb()
 
   // Mark all contributions as excluded
-  await supabase
+  const { data: excluded } = await supabase
     .from('contributions')
     .update({ is_excluded: true })
     .eq('user_id', userId)
+    .select('word_id')
 
   // Update user profile
   await supabase
@@ -218,5 +223,37 @@ export async function excludeAllContributions(formData: FormData) {
       reason: 'All contributions excluded by admin',
     })
 
+  // Their glosses no longer count, so every word they contributed to changes
+  for (const { word_id } of excluded || []) {
+    await calculateConsensus(word_id)
+  }
+
   revalidatePath('/admin')
+  revalidatePath('/dictionary')
+}
+
+// Consensus backfill
+
+export type RecalculateConsensusResult =
+  | { ok: true; total: number; changed: number; failed: number }
+  | { ok: false; error: string }
+
+export async function recalculateConsensusForAllWords(): Promise<RecalculateConsensusResult> {
+  // Checked server-side through is_current_user_admin(); the service-role
+  // writes below are only reachable by an admin session
+  if (!(await isUserAdmin())) {
+    return { ok: false, error: 'Unauthorized: Admin access required' }
+  }
+
+  try {
+    const { total, changed, failed } = await recalculateAllConsensus()
+
+    revalidatePath('/admin')
+    revalidatePath('/dictionary')
+
+    return { ok: true, total, changed, failed }
+  } catch (error) {
+    console.error('Error recalculating consensus:', error)
+    return { ok: false, error: 'Recalculation failed. Check the server logs.' }
+  }
 }
