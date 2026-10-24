@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { agreeWithTranslation } from '@/app/contribute/actions'
 import { uploadAudio } from '@/lib/uploadAudio'
+import { formatReference } from '@/lib/bible-reference'
 import { createClientComponentClient } from '@/lib/supabase-client'
 import type { Word, Contribution, ContributionFormData, ContributionWithProfile, ContributionGroup, CommentWithProfile } from '@/lib/types'
 import ConsensusBar from './ConsensusBar'
@@ -302,7 +303,7 @@ export default function WordCard({ word, userContribution, allContributions, com
             <div className="grid md:grid-cols-2 gap-4 mb-4">
               <div className="bg-primary-50 rounded-lg p-4">
                 <div className="text-xs font-medium text-primary-700 mb-2">
-                  {word.example_reference}
+                  {formatReference(word.example_reference)}
                 </div>
                 <p className="text-gray-800 italic">{word.example_motu}</p>
               </div>
@@ -319,7 +320,7 @@ export default function WordCard({ word, userContribution, allContributions, com
               <div key={verse.ref} className="grid md:grid-cols-2 gap-4 mb-4">
                 <div className="bg-primary-50 rounded-lg p-4">
                   <div className="text-xs font-medium text-primary-700 mb-2">
-                    {verse.ref}
+                    {formatReference(verse.ref)}
                   </div>
                   <p className="text-gray-800 italic">{verse.motu}</p>
                 </div>
