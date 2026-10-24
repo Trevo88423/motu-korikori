@@ -26,9 +26,9 @@ export default async function AdminPage() {
   // Suspended and banned members, so they can be reinstated
   const { data: inactiveUsers } = await supabase
     .from('profiles')
-    .select('id, name, connection_type, status')
+    .select('id, display_name, connection_type, status')
     .in('status', ['suspended', 'banned'])
-    .order('name', { ascending: true })
+    .order('display_name', { ascending: true })
     .limit(50)
 
   // Fetch recent moderation log
@@ -199,7 +199,7 @@ export default async function AdminPage() {
               {inactiveUsers.map((user: any) => (
                 <div key={user.id} className="p-4 bg-red-50 border border-red-200 rounded-lg flex items-center justify-between">
                   <div>
-                    <h3 className="font-bold text-gray-900">{user.name}</h3>
+                    <h3 className="font-bold text-gray-900">{user.display_name}</h3>
                     <p className="text-sm text-gray-600 mt-1">Status: {user.status}</p>
                   </div>
                   <form action={reinstateUser}>
