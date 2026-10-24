@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 import type { CookieOptions } from '@supabase/ssr'
+import {
+  RECOVERY_COOKIE,
+  createRecoveryMarker,
+  recoveryCookieOptions,
+} from '@/lib/recovery-marker'
 
 // Only allow same-site relative paths as a post-auth destination, so a crafted
 // ?next=https://evil.example cannot turn this route into an open redirect.
@@ -66,14 +71,34 @@ export async function GET(request: NextRequest) {
     const otpType =
       type === 'recovery' ? 'recovery' : type === 'signup' ? 'signup' : 'email'
 
-    const { error } = await supabase.auth.verifyOtp({
+    const { data: otp, error } = await supabase.auth.verifyOtp({
       token_hash,
       type: otpType as 'recovery' | 'email' | 'signup',
     })
 
     if (error) return failure('token_hash', error)
 
-    return redirectTo(successPath)
+    const res = redirectTo(successPath)
+
+    // verifyOtp only succeeds with type 'recovery' for a genuine recovery
+    // token, so this is the one place a session is known to have come from a
+    // reset link. /reset-password refuses to work without this marker.
+    if (otpType === 'recovery') {
+      const accessToken = otp.session?.access_token
+      const { data: claims } = accessToken
+        ? await supabase.auth.getClaims(accessToken)
+        : { data: null }
+      const userId = claims?.claims.sub
+      const sessionId = claims?.claims.session_id
+      if (!userId || !sessionId) return failure('recovery_claims', 'no session after verifyOtp')
+      res.cookies.set(
+        RECOVERY_COOKIE,
+        createRecoveryMarker(userId, sessionId),
+        recoveryCookieOptions
+      )
+    }
+
+    return res
   }
 
   // PKCE flow — from email templates using {{ .ConfirmationURL }}
