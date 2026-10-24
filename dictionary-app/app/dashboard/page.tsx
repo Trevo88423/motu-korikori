@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createServerComponentClient, getCurrentUserProfile, getTotalWordCount } from '@/lib/supabase'
 import Link from 'next/link'
+import DisplayNameForm from './DisplayNameForm'
 
 export const dynamic = 'force-dynamic'
 
@@ -53,12 +54,14 @@ export default async function DashboardPage() {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900">
-          {totalContributions > 0 ? `Welcome back, ${profile.name}!` : `Welcome, ${profile.name}!`}
+          {totalContributions > 0 ? `Welcome back, ${profile.display_name}!` : `Welcome, ${profile.display_name}!`}
         </h1>
         <p className="text-gray-600 mt-2">
           {connectionTypeLabels[profile.connection_type]} • Trust Score: {profile.trust_score.toFixed(2)}
         </p>
       </div>
+
+      <DisplayNameForm initial={profile.display_name} />
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
