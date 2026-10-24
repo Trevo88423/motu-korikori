@@ -1,5 +1,5 @@
 -- =============================================================================
--- 20261024121400 — Stop the API returning contributors' full names (issue #13,
+-- 20261024121500 — Stop the API returning contributors' full names (issue #13,
 -- part 2 of 2)
 --
 -- Part 1 (20261024121300_display_names) added display_name and moved every
