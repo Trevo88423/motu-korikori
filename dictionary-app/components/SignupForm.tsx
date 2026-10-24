@@ -8,6 +8,7 @@ interface SignupFormProps {
     password: string
     confirmPassword?: string
     name: string
+    display_name: string
     age_range: AgeRange | ''
     locations: string[]
     connection_type: ConnectionType | ''
@@ -108,6 +109,27 @@ export default function SignupForm({ formData, onChange, errors }: SignupFormPro
               required
             />
             {errors.name && <p className="text-sm text-red-600 mt-1">{errors.name}</p>}
+            <p className="text-xs text-gray-500 mt-1">Kept private. Never shown on the site.</p>
+          </div>
+
+          <div>
+            <label htmlFor="signup-display-name" className="label">
+              Display Name
+            </label>
+            <input
+              id="signup-display-name"
+              type="text"
+              value={formData.display_name}
+              onChange={(e) => onChange('display_name', e.target.value)}
+              className="input"
+              autoComplete="nickname"
+              maxLength={40}
+              placeholder={formData.name.trim().split(/\s+/)[0] || 'e.g. your first name'}
+              aria-describedby="signup-display-name-help"
+            />
+            <p id="signup-display-name-help" className="text-xs text-gray-500 mt-1">
+              How you appear on the leaderboard. Leave blank to use your first name. You can change it later.
+            </p>
           </div>
         </div>
       </div>

@@ -38,6 +38,7 @@ export type ModerationAction =
 export interface Profile {
   id: string;
   name: string;
+  display_name: string; // shown publicly; name is private (#13)
   email: string;
   age_range: AgeRange;
   locations: string[];
@@ -145,11 +146,11 @@ export interface WordWithContributions extends Word {
 }
 
 export interface ContributionWithProfile extends Contribution {
-  profile?: Pick<Profile, 'name' | 'connection_type' | 'trust_score'>;
+  profile?: Pick<Profile, 'display_name' | 'connection_type' | 'trust_score'>;
 }
 
 export interface CommentWithProfile extends Comment {
-  profile?: Pick<Profile, 'name' | 'connection_type' | 'trust_score'>;
+  profile?: Pick<Profile, 'display_name' | 'connection_type' | 'trust_score'>;
   user_vote?: 1 | -1 | null; // Current user's vote on this comment
 }
 
@@ -170,6 +171,7 @@ export interface SignupFormData {
   email: string;
   password: string;
   name: string;
+  display_name?: string;
   age_range: AgeRange;
   locations: string[];
   connection_type: ConnectionType;

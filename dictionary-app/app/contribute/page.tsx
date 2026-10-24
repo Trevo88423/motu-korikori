@@ -103,7 +103,7 @@ export default async function ContributePage({
     .from('contributions')
     .select(`
       *,
-      profile:profiles(name, connection_type, trust_score)
+      profile:profiles(display_name, connection_type, trust_score)
     `)
     .eq('word_id', word.id)
     .order('created_at', { ascending: false })
@@ -113,7 +113,7 @@ export default async function ContributePage({
     .from('comments')
     .select(`
       *,
-      profile:profiles(name, connection_type, trust_score)
+      profile:profiles(display_name, connection_type, trust_score)
     `)
     .eq('word_id', word.id)
     .order('net_votes', { ascending: false })

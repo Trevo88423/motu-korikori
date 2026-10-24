@@ -18,7 +18,7 @@ export default async function AdminPage() {
   // Fetch low trust users
   const { data: lowTrustUsers } = await supabase
     .from('profiles')
-    .select('id, name, connection_type, trust_score, contribution_count, status')
+    .select('id, display_name, connection_type, trust_score, contribution_count, status')
     .lt('trust_score', 0.7)
     .order('trust_score', { ascending: true })
     .limit(20)
@@ -36,8 +36,8 @@ export default async function AdminPage() {
     .from('moderation_log')
     .select(`
       *,
-      admin:profiles!moderation_log_admin_id_fkey(name),
-      target_user:profiles!moderation_log_target_user_id_fkey(name),
+      admin:profiles!moderation_log_admin_id_fkey(display_name),
+      target_user:profiles!moderation_log_target_user_id_fkey(display_name),
       target_word:words(motu_word)
     `)
     .order('created_at', { ascending: false })
@@ -134,7 +134,7 @@ export default async function AdminPage() {
                 <div key={user.id} className="p-4 bg-gray-50 border border-gray-200 rounded-lg">
                   <div className="flex items-start justify-between mb-4">
                     <div>
-                      <h3 className="font-bold text-gray-900">{user.name}</h3>
+                      <h3 className="font-bold text-gray-900">{user.display_name}</h3>
                       <p className="text-sm text-gray-600 mt-1">
                         Trust Score: {user.trust_score.toFixed(2)} •
                         Status: {user.status} •
@@ -230,13 +230,13 @@ export default async function AdminPage() {
                 <div key={log.id} className="p-3 bg-gray-50 rounded-lg text-sm">
                   <div className="flex items-start justify-between">
                     <div>
-                      <span className="font-medium">{log.admin.name}</span>
+                      <span className="font-medium">{log.admin.display_name}</span>
                       <span className="text-gray-600"> performed </span>
                       <span className="font-medium text-primary-600">{log.action.replace('_', ' ')}</span>
                       {log.target_user && (
                         <>
                           <span className="text-gray-600"> on user </span>
-                          <span className="font-medium">{log.target_user.name}</span>
+                          <span className="font-medium">{log.target_user.display_name}</span>
                         </>
                       )}
                       {log.target_word && (

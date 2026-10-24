@@ -62,7 +62,7 @@ export default async function MyContributionsPage() {
       <div className="card mb-6 sm:mb-8">
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-4">
           <div>
-            <h2 className="text-xl sm:text-2xl font-bold text-gray-900">{profile.name}</h2>
+            <h2 className="text-xl sm:text-2xl font-bold text-gray-900">{profile.display_name}</h2>
             <p className="text-sm sm:text-base text-gray-600">{connectionTypeLabels[profile.connection_type]}</p>
           </div>
           <div className="sm:text-right">
