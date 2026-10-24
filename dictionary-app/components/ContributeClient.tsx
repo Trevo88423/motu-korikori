@@ -4,6 +4,33 @@ import { useRouter } from 'next/navigation'
 import WordCard from './WordCard'
 import type { Word, Contribution, ContributionFormData, ContributionWithProfile, CommentWithProfile } from '@/lib/types'
 
+const SKIPPED_KEY = 'truemotu:skipped-words'
+const MAX_SKIPPED = 50
+
+// Words skipped this session, most recent first. Session storage can be
+// unavailable (private mode, blocked storage); then there's just no list.
+function readSkipped(): string[] {
+  try {
+    const ids: unknown = JSON.parse(sessionStorage.getItem(SKIPPED_KEY) || '[]')
+    return Array.isArray(ids) ? ids.filter((id): id is string => typeof id === 'string') : []
+  } catch {
+    return []
+  }
+}
+
+function writeSkipped(ids: string[]) {
+  try {
+    sessionStorage.setItem(SKIPPED_KEY, JSON.stringify(ids))
+  } catch {
+    // ignore
+  }
+}
+
+// /contribute URL asking for a word other than the recently skipped ones
+function nextWordUrl(skipped: string[]) {
+  return skipped.length > 0 ? `/contribute?skip=${skipped.join(',')}` : '/contribute'
+}
+
 interface ContributeClientProps {
   word: Word
   userContribution?: Contribution
@@ -26,8 +53,10 @@ export default function ContributeClient({
   const router = useRouter()
 
   const handleSkip = () => {
-    // Just refresh to get the next word
-    router.push('/contribute')
+    // Remember this word so the next pick leaves it out
+    const skipped = [word.id, ...readSkipped().filter((id) => id !== word.id)].slice(0, MAX_SKIPPED)
+    writeSkipped(skipped)
+    router.push(nextWordUrl(skipped))
     router.refresh()
   }
 
@@ -42,7 +71,7 @@ export default function ContributeClient({
   const handleComplete = async () => {
     await onComplete(word.id)
     // Navigate to next word after marking complete
-    router.push('/contribute')
+    router.push(nextWordUrl(readSkipped()))
     router.refresh()
   }
 
