@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createServerComponentClient } from '@/lib/supabase'
+import { requireActiveUserForAction } from '@/lib/auth'
 import type { CommentFormData, VoteAction } from '@/lib/types'
 
 // ============================================================================
@@ -9,28 +10,11 @@ import type { CommentFormData, VoteAction } from '@/lib/types'
 // ============================================================================
 
 export async function addComment(data: CommentFormData) {
-  const supabase = await createServerComponentClient()
-
-  // Get current user
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) {
-    throw new Error('Not authenticated')
-  }
+  const { supabase, user } = await requireActiveUserForAction()
 
   // Validate comment length
   if (data.comment_text.length < 20 || data.comment_text.length > 500) {
     throw new Error('Comment must be between 20 and 500 characters')
-  }
-
-  // Check user status
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('status, trust_score')
-    .eq('id', user.id)
-    .single()
-
-  if (profile?.status === 'suspended' || profile?.status === 'banned') {
-    throw new Error('Your account has been suspended')
   }
 
   // Insert comment (unique constraint prevents duplicate)
@@ -55,13 +39,7 @@ export async function addComment(data: CommentFormData) {
 }
 
 export async function updateComment(commentId: string, commentText: string, wordId?: string) {
-  const supabase = await createServerComponentClient()
-
-  // Get current user
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) {
-    throw new Error('Not authenticated')
-  }
+  const { supabase, user } = await requireActiveUserForAction()
 
   // Validate comment length
   if (commentText.length < 20 || commentText.length > 500) {
@@ -88,13 +66,7 @@ export async function updateComment(commentId: string, commentText: string, word
 }
 
 export async function deleteComment(commentId: string, wordId?: string) {
-  const supabase = await createServerComponentClient()
-
-  // Get current user
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) {
-    throw new Error('Not authenticated')
-  }
+  const { supabase, user } = await requireActiveUserForAction()
 
   // Delete comment (RLS ensures user owns it)
   const { error } = await supabase
@@ -115,13 +87,7 @@ export async function deleteComment(commentId: string, wordId?: string) {
 }
 
 export async function flagComment(commentId: string, wordId?: string) {
-  const supabase = await createServerComponentClient()
-
-  // Get current user
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) {
-    throw new Error('Not authenticated')
-  }
+  const { supabase, user } = await requireActiveUserForAction()
 
   // Increment flag count
   const { error } = await supabase.rpc('increment_comment_flags', {
@@ -144,13 +110,7 @@ export async function flagComment(commentId: string, wordId?: string) {
 // ============================================================================
 
 export async function voteOnComment(action: VoteAction, wordId?: string) {
-  const supabase = await createServerComponentClient()
-
-  // Get current user
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) {
-    throw new Error('Not authenticated')
-  }
+  const { supabase, user } = await requireActiveUserForAction()
 
   if (!action.vote_type || (action.vote_type !== 1 && action.vote_type !== -1)) {
     throw new Error('Invalid vote type')
@@ -215,13 +175,7 @@ export async function voteOnComment(action: VoteAction, wordId?: string) {
 }
 
 export async function voteOnContribution(contributionId: string, wordId?: string) {
-  const supabase = await createServerComponentClient()
-
-  // Get current user
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) {
-    throw new Error('Not authenticated')
-  }
+  const { supabase, user } = await requireActiveUserForAction()
 
   // Check if user has already submitted a translation for this word
   const { data: contribution } = await supabase

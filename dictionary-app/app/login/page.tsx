@@ -10,6 +10,8 @@ import Link from 'next/link'
 const ERROR_MESSAGES: Record<string, string> = {
   link_invalid:
     'That link is no longer valid — it may have expired or already been used. Request a new one below.',
+  account_inactive:
+    'This account has been suspended or banned, so you have been signed out. If you think this is a mistake, please contact the Truemotu team.',
 }
 
 const MESSAGE_MESSAGES: Record<string, string> = {
