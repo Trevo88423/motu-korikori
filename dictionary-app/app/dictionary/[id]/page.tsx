@@ -4,6 +4,7 @@ import Link from 'next/link'
 import ConsensusBar from '@/components/ConsensusBar'
 import CommentSection from '@/components/CommentSection'
 import LinguisticAnalysis from '@/components/LinguisticAnalysis'
+import FlagButton from '@/components/FlagButton'
 import { formatReference } from '@/lib/bible-reference'
 import type { Word, ContributionWithProfile, ContributionGroup } from '@/lib/types'
 
@@ -89,7 +90,8 @@ export default async function WordDetailPage({
     const grouped = new Map<string, ContributionWithProfile[]>()
 
     contributions.forEach((contrib: any) => {
-      if (!contrib.is_excluded) {
+      // Hidden by flags: only its author and admins see it, and it doesn't count
+      if (!contrib.is_excluded && !contrib.is_hidden) {
         const existing = grouped.get(contrib.english_gloss) || []
         grouped.set(contrib.english_gloss, [...existing, contrib])
       }
@@ -252,7 +254,7 @@ export default async function WordDetailPage({
 
         {/* All Contributions */}
         {contributions && contributions.length > 0 && (
-          <div>
+          <div id="translations">
             <h3 className="font-medium text-gray-900 mb-4">
               All Contributions ({contributions.length})
             </h3>
@@ -262,6 +264,7 @@ export default async function WordDetailPage({
                   key={contrib.id}
                   className={`p-4 rounded-lg ${
                     contrib.is_excluded ? 'bg-red-50 border border-red-200' :
+                    contrib.is_hidden ? 'bg-amber-50 border border-amber-200' :
                     contrib.english_gloss === word.consensus_gloss ? 'bg-green-50 border border-green-200' :
                     'bg-gray-50'
                   }`}
@@ -277,7 +280,12 @@ export default async function WordDetailPage({
                             Excluded
                           </span>
                         )}
-                        {contrib.english_gloss === word.consensus_gloss && !contrib.is_excluded && (
+                        {contrib.is_hidden && (
+                          <span className="px-2 py-0.5 bg-amber-100 text-amber-800 text-xs rounded">
+                            Hidden after flags, waiting for review
+                          </span>
+                        )}
+                        {contrib.english_gloss === word.consensus_gloss && !contrib.is_excluded && !contrib.is_hidden && (
                           <svg className="w-4 h-4 text-green-600" fill="currentColor" viewBox="0 0 20 20">
                             <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                           </svg>
@@ -305,6 +313,12 @@ export default async function WordDetailPage({
                       )}
                     </div>
                   </div>
+
+                  {user && contrib.user_id !== user.id && !contrib.is_hidden && (
+                    <div className="mt-2 pt-2 border-t border-gray-200">
+                      <FlagButton kind="contribution" targetId={contrib.id} />
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

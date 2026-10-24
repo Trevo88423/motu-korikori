@@ -101,25 +101,6 @@ export async function deleteComment(commentId: string, wordId?: string) {
   }
 }
 
-export async function flagComment(commentId: string, wordId?: string) {
-  const { supabase, user } = await requireActiveUserForAction()
-
-  // Increment flag count
-  const { error } = await supabase.rpc('increment_comment_flags', {
-    comment_uuid: commentId
-  })
-
-  if (error) {
-    console.error('Error flagging comment:', error)
-    throw new Error('Failed to flag comment')
-  }
-
-  revalidatePath('/dictionary/[id]', 'page')
-  if (wordId) {
-    revalidatePath(`/contribute?word=${wordId}`, 'page')
-  }
-}
-
 // ============================================================================
 // VOTING ACTIONS
 // ============================================================================

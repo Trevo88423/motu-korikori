@@ -32,7 +32,9 @@ export type ModerationAction =
   | 'exclude_contributions'
   | 'verify_word'
   | 'flag_word'
-  | 'unflag_word';
+  | 'unflag_word'
+  | 'restore_content'
+  | 'confirm_hide';
 
 // Database table types
 export interface Profile {
@@ -93,6 +95,12 @@ export interface Contribution {
   confidence: ConfidenceLevel;
   notes: string | null;
   is_excluded: boolean;
+  // Hidden by weighted flags (#56); only the author and admins can see it
+  is_hidden: boolean;
+  flag_count: number;
+  flag_weight: number;
+  hidden_at: string | null;
+  hide_confirmed_at: string | null;
   matches_consensus: boolean | null;
   upvote_count: number;
   net_votes: number;
@@ -106,8 +114,12 @@ export interface Comment {
   word_id: string;
   user_id: string;
   comment_text: string;
+  // Hidden by weighted flags; only the author and admins can see it
   is_flagged: boolean;
   flag_count: number;
+  flag_weight: number;
+  hidden_at: string | null;
+  hide_confirmed_at: string | null;
   upvote_count: number;
   downvote_count: number;
   net_votes: number;

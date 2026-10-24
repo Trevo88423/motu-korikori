@@ -2,13 +2,28 @@ import { requireActiveUser } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase'
 import Link from 'next/link'
 import BlockedTermsSection from './BlockedTermsSection'
-import { verifyWord, flagWord, unflagWord, warnUser, suspendUser, banUser, reinstateUser, excludeFromAI, excludeAllContributions } from './actions'
+import { verifyWord, flagWord, unflagWord, warnUser, suspendUser, banUser, reinstateUser, excludeFromAI, excludeAllContributions, restoreHidden, confirmHidden, updateModerationSetting } from './actions'
+import { flagReasonLabel } from '@/lib/flags'
 import RecalculateConsensusButton from './RecalculateConsensusButton'
 import AdminRoleButton from './AdminRoleButton'
 
 export const dynamic = 'force-dynamic'
 // The consensus backfill action runs from this page and can take a while
 export const maxDuration = 300
+
+// "Spam or junk ×2, Offensive or rude ×1" from the flags no admin has decided yet
+function summariseReasons(flags: { reason: string | null; outcome: string }[] | null) {
+  const counts = new Map<string, number>()
+  for (const f of flags || []) {
+    if (f.outcome !== 'pending') continue
+    const label = flagReasonLabel(f.reason)
+    counts.set(label, (counts.get(label) || 0) + 1)
+  }
+  return [...counts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .map(([label, n]) => `${label} ×${n}`)
+    .join(', ')
+}
 
 function formatDate(value: string) {
   return new Date(value).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
@@ -63,6 +78,45 @@ export default async function AdminPage({
       .update({ welcomed_at: new Date().toISOString() })
       .eq('user_id', profile.id)
   }
+
+  // Items hidden by flags that no admin has decided on yet (#56). Admins can
+  // read hidden rows and their flags through RLS.
+  const [{ data: hiddenContributions }, { data: hiddenComments }, { data: moderationSettings }] =
+    await Promise.all([
+      supabase
+        .from('contributions')
+        .select(`
+          id, word_id, english_gloss, flag_count, flag_weight, hidden_at,
+          word:words(motu_word),
+          profile:profiles(display_name),
+          flags:contribution_flags(reason, outcome)
+        `)
+        .eq('is_hidden', true)
+        .is('hide_confirmed_at', null)
+        .order('hidden_at', { ascending: false })
+        .limit(50),
+      supabase
+        .from('comments')
+        .select(`
+          id, word_id, comment_text, flag_count, flag_weight, hidden_at,
+          word:words(motu_word),
+          profile:profiles(display_name),
+          flags:comment_flags(reason, outcome)
+        `)
+        .eq('is_flagged', true)
+        .is('hide_confirmed_at', null)
+        .order('hidden_at', { ascending: false })
+        .limit(50),
+      supabase
+        .from('moderation_settings')
+        .select('key, value, description')
+        .order('key'),
+    ])
+
+  const hiddenItems = [
+    ...(hiddenContributions || []).map((c: any) => ({ ...c, kind: 'contribution' as const, text: c.english_gloss })),
+    ...(hiddenComments || []).map((c: any) => ({ ...c, kind: 'comment' as const, text: c.comment_text })),
+  ].sort((a, b) => (b.hidden_at || '').localeCompare(a.hidden_at || ''))
 
   // Fetch flagged words
   const { data: flaggedWords } = await supabase
@@ -136,7 +190,10 @@ export default async function AdminPage({
       <div className="mb-8">
         <div className="border-b border-gray-200">
           <nav className="-mb-px flex flex-wrap gap-x-8">
-            <a href="#flagged-words" className="border-b-2 border-primary-500 py-4 px-1 text-sm font-medium text-primary-600">
+            <a href="#hidden-by-flags" className="border-b-2 border-primary-500 py-4 px-1 text-sm font-medium text-primary-600">
+              Hidden by Flags
+            </a>
+            <a href="#flagged-words" className="border-transparent py-4 px-1 text-sm font-medium text-gray-500 hover:text-gray-700 hover:border-gray-300">
               Flagged Words
             </a>
             <a href="#low-trust" className="border-transparent py-4 px-1 text-sm font-medium text-gray-500 hover:text-gray-700 hover:border-gray-300">
@@ -155,6 +212,90 @@ export default async function AdminPage({
               Moderation Log
             </a>
           </nav>
+        </div>
+      </div>
+
+      {/* Hidden by Flags Section */}
+      <div id="hidden-by-flags" className="mb-12">
+        <div className="card">
+          <h2 className="text-xl font-bold text-gray-900 mb-2">
+            Hidden by Flags ({hiddenItems.length})
+          </h2>
+          <p className="text-sm text-gray-600 mb-6">
+            The community hid these automatically. Nothing needs doing unless one looks wrong.
+            Restoring brings it back and lowers the flaggers&apos; future flag weight; confirming
+            keeps it hidden and takes it off this list.
+          </p>
+
+          {hiddenItems.length > 0 ? (
+            <div className="space-y-4">
+              {hiddenItems.map((item: any) => (
+                <div key={`${item.kind}-${item.id}`} className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                  <div className="mb-3 min-w-0">
+                    <p className="text-xs font-medium uppercase text-amber-800">
+                      {item.kind === 'contribution' ? 'Translation' : 'Comment'} on{' '}
+                      <Link href={`/dictionary/${item.word_id}`} className="text-primary-600 hover:underline normal-case">
+                        {item.word?.motu_word}
+                      </Link>
+                    </p>
+                    <p className="text-gray-900 mt-1 break-words">{item.text}</p>
+                    <p className="text-sm text-gray-600 mt-1">
+                      By {item.profile?.display_name || 'unknown'} •{' '}
+                      {item.flag_count} {item.flag_count === 1 ? 'flag' : 'flags'} (weight {Number(item.flag_weight).toFixed(2)})
+                      {item.hidden_at && <> • hidden {new Date(item.hidden_at).toLocaleDateString()}</>}
+                    </p>
+                    <p className="text-sm text-gray-700 mt-1">
+                      Reasons: {summariseReasons(item.flags) || 'none recorded'}
+                    </p>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    <form action={restoreHidden}>
+                      <input type="hidden" name="kind" value={item.kind} />
+                      <input type="hidden" name="targetId" value={item.id} />
+                      <button type="submit" className="btn btn-primary text-sm">
+                        Restore
+                      </button>
+                    </form>
+                    <form action={confirmHidden}>
+                      <input type="hidden" name="kind" value={item.kind} />
+                      <input type="hidden" name="targetId" value={item.id} />
+                      <button type="submit" className="btn btn-ghost text-sm text-red-600">
+                        Confirm hide
+                      </button>
+                    </form>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-gray-500 text-center py-8">Nothing hidden by flags</p>
+          )}
+
+          {moderationSettings && moderationSettings.length > 0 && (
+            <details className="mt-6 border-t pt-4">
+              <summary className="text-sm font-medium text-gray-700 cursor-pointer">Flag settings</summary>
+              <div className="mt-3 space-y-3">
+                {moderationSettings.map((setting: any) => (
+                  <form key={setting.key} action={updateModerationSetting} className="flex flex-wrap items-end gap-2">
+                    <input type="hidden" name="key" value={setting.key} />
+                    <label className="flex-1 min-w-[12rem] text-sm text-gray-700">
+                      {setting.description}
+                      <input
+                        type="number"
+                        name="value"
+                        step="0.05"
+                        min="0"
+                        defaultValue={setting.value}
+                        className="input mt-1"
+                      />
+                    </label>
+                    <button type="submit" className="btn btn-ghost text-sm">Save</button>
+                  </form>
+                ))}
+              </div>
+            </details>
+          )}
         </div>
       </div>
 
