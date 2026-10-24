@@ -1,6 +1,7 @@
 import { requireActiveUser } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase'
 import Link from 'next/link'
+import BlockedTermsSection from './BlockedTermsSection'
 import { verifyWord, flagWord, unflagWord, warnUser, suspendUser, banUser, reinstateUser, excludeFromAI, excludeAllContributions } from './actions'
 import RecalculateConsensusButton from './RecalculateConsensusButton'
 import AdminRoleButton from './AdminRoleButton'
@@ -99,6 +100,19 @@ export default async function AdminPage({
     .order('created_at', { ascending: false })
     .limit(50)
 
+  // Bad-language filter (#54): the list, and how often it refused text this week
+  const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+  const [{ data: blockedTerms }, { count: blockedAttempts }] = await Promise.all([
+    supabase
+      .from('blocked_terms')
+      .select('id, term, language, category, approved, created_at')
+      .order('term', { ascending: true }),
+    supabase
+      .from('blocked_language_attempts')
+      .select('id', { count: 'exact', head: true })
+      .gte('created_at', weekAgo),
+  ])
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="mb-8">
@@ -121,7 +135,7 @@ export default async function AdminPage({
       {/* Tabs */}
       <div className="mb-8">
         <div className="border-b border-gray-200">
-          <nav className="-mb-px flex space-x-8">
+          <nav className="-mb-px flex flex-wrap gap-x-8">
             <a href="#flagged-words" className="border-b-2 border-primary-500 py-4 px-1 text-sm font-medium text-primary-600">
               Flagged Words
             </a>
@@ -133,6 +147,9 @@ export default async function AdminPage({
             </a>
             <a href="#admins" className="border-transparent py-4 px-1 text-sm font-medium text-gray-500 hover:text-gray-700 hover:border-gray-300">
               Admins
+            </a>
+            <a href="#blocked-terms" className="border-transparent py-4 px-1 text-sm font-medium text-gray-500 hover:text-gray-700 hover:border-gray-300">
+              Blocked Language
             </a>
             <a href="#moderation-log" className="border-transparent py-4 px-1 text-sm font-medium text-gray-500 hover:text-gray-700 hover:border-gray-300">
               Moderation Log
@@ -375,6 +392,8 @@ export default async function AdminPage({
           )}
         </div>
       </div>
+
+      <BlockedTermsSection terms={blockedTerms ?? []} attemptsThisWeek={blockedAttempts ?? 0} />
 
       {/* Moderation Log Section */}
       <div id="moderation-log">
