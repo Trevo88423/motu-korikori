@@ -22,6 +22,7 @@ export default function SignupPage() {
     password: '',
     confirmPassword: '',
     name: '',
+    display_name: '',
     age_range: '' as AgeRange | '',
     locations: [] as string[],
     connection_type: '' as ConnectionType | '',
@@ -143,6 +144,7 @@ export default function SignupPage() {
           emailRedirectTo: `${window.location.origin}/auth/callback?type=signup`,
           data: {
             name: formData.name,
+            display_name: formData.display_name.trim(),
             age_range: formData.age_range,
             locations: formData.locations,
             connection_type: formData.connection_type,

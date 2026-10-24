@@ -34,7 +34,7 @@ export default async function WordDetailPage({
       .from('contributions')
       .select(`
         *,
-        profile:profiles(name, connection_type, trust_score)
+        profile:profiles(display_name, connection_type, trust_score)
       `)
       .eq('word_id', id)
       .order('created_at', { ascending: false }),
@@ -42,7 +42,7 @@ export default async function WordDetailPage({
       .from('comments')
       .select(`
         *,
-        profile:profiles(name, connection_type, trust_score)
+        profile:profiles(display_name, connection_type, trust_score)
       `)
       .eq('word_id', id)
       .order('net_votes', { ascending: false }),
