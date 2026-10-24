@@ -10,6 +10,8 @@ export default async function LeaderboardPage() {
   const { data: topContributors } = await supabase
     .from('profiles')
     .select('id, name, contribution_count, connection_type, trust_score, status')
+    .gt('contribution_count', 0)
+    .neq('status', 'banned')
     .order('contribution_count', { ascending: false })
     .limit(100)
 
@@ -17,15 +19,25 @@ export default async function LeaderboardPage() {
   const { data: { user } } = await supabase.auth.getUser()
 
   // If user is logged in but not in top 100, get their rank
+  // (only once they have contributed; a 0 isn't a ranking)
   let currentUserRank = null
   if (user && !topContributors?.find(c => c.id === user.id)) {
-    const { count } = await supabase
+    const { data: me } = await supabase
       .from('profiles')
-      .select('id', { count: 'exact', head: true })
-      .gt('contribution_count', topContributors?.[topContributors.length - 1]?.contribution_count || 0)
+      .select('contribution_count')
+      .eq('id', user.id)
+      .maybeSingle()
 
-    if (count !== null) {
-      currentUserRank = count + 1
+    if (me && me.contribution_count > 0) {
+      const { count } = await supabase
+        .from('profiles')
+        .select('id', { count: 'exact', head: true })
+        .gt('contribution_count', me.contribution_count)
+        .neq('status', 'banned')
+
+      if (count !== null) {
+        currentUserRank = count + 1
+      }
     }
   }
 
@@ -128,6 +140,13 @@ export default async function LeaderboardPage() {
                   </tr>
                 )
               })}
+              {(!topContributors || topContributors.length === 0) && (
+                <tr>
+                  <td colSpan={5} className="py-8 text-center text-gray-500">
+                    No contributions yet. Be the first!
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
@@ -144,12 +163,14 @@ export default async function LeaderboardPage() {
 
       {/* Quick Actions */}
       <div className="mt-6 sm:mt-8 flex flex-col sm:flex-row justify-center gap-3 sm:gap-4">
-        <Link href="/contribute" className="btn btn-primary text-center">
+        <Link href={user ? '/contribute' : '/signup'} className="btn btn-primary text-center">
           Start Contributing
         </Link>
-        <Link href="/my-contributions" className="btn btn-ghost text-center">
-          View My Contributions
-        </Link>
+        {user && (
+          <Link href="/my-contributions" className="btn btn-ghost text-center">
+            View My Contributions
+          </Link>
+        )}
       </div>
     </div>
   )
