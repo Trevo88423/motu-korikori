@@ -74,19 +74,17 @@ export const getTotalWordCount = cache(async (): Promise<number> => {
   return count
 })
 
-// Helper function to check if user is admin
-export async function isUserAdmin(userId: string): Promise<boolean> {
+// Helper function to check if the current user is admin.
+// is_admin isn't readable through the profiles table (column grants), so this
+// goes through the SECURITY DEFINER helper, which only answers for the caller.
+export async function isUserAdmin(): Promise<boolean> {
   const supabase = await createServerComponentClient()
 
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('is_admin')
-    .eq('id', userId)
-    .single()
+  const { data, error } = await supabase.rpc('is_current_user_admin')
 
-  if (error || !data) return false
+  if (error) return false
 
-  return data.is_admin
+  return data === true
 }
 
 // Helper function to get current user profile
@@ -97,13 +95,11 @@ export async function getCurrentUserProfile() {
 
   if (!user) return null
 
-  const { data: profile, error } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', user.id)
-    .single()
+  // Private columns (email, guardian details, is_admin...) aren't readable
+  // through the profiles table; get_my_profile() returns only the caller's row.
+  const { data: profile, error } = await supabase.rpc('get_my_profile')
 
-  if (error) return null
+  if (error || !profile?.id) return null
 
   return profile
 }
