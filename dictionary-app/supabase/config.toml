@@ -18,3 +18,30 @@ additional_redirect_urls = [
 # Match production: signups must click the emailed link before signing in.
 # Local emails land in Mailpit at http://127.0.0.1:54324.
 enable_confirmations = true
+
+# Auth emails: same files as production (pasted into the dashboard).
+# Edit build.py and re-run it, never the .html directly.
+
+[auth.email.template.confirmation]
+subject = "Confirm your email for True Motu Dictionary"
+content_path = "./supabase/templates/confirmation.html"
+
+[auth.email.template.recovery]
+subject = "Reset your True Motu Dictionary password"
+content_path = "./supabase/templates/recovery.html"
+
+[auth.email.template.magic_link]
+subject = "Your True Motu Dictionary sign-in link"
+content_path = "./supabase/templates/magic_link.html"
+
+[auth.email.template.email_change]
+subject = "Confirm your new email for True Motu Dictionary"
+content_path = "./supabase/templates/email_change.html"
+
+[auth.email.template.invite]
+subject = "You're invited to True Motu Dictionary"
+content_path = "./supabase/templates/invite.html"
+
+[auth.email.template.reauthentication]
+subject = "Your True Motu Dictionary verification code"
+content_path = "./supabase/templates/reauthentication.html"
