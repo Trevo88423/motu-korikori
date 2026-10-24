@@ -124,8 +124,9 @@ export default function ConsentForm({ formData, onChange }: ConsentFormProps) {
             </p>
 
             <div>
-              <label className="label">Guardian Name<span className="text-red-500"> *</span></label>
+              <label htmlFor="signup-guardian-name" className="label">Guardian Name<span className="text-red-500"> *</span></label>
               <input
+                id="signup-guardian-name"
                 type="text"
                 value={formData.guardian_name || ''}
                 onChange={(e) => onChange('guardian_name', e.target.value)}
@@ -135,8 +136,9 @@ export default function ConsentForm({ formData, onChange }: ConsentFormProps) {
             </div>
 
             <div>
-              <label className="label">Guardian Email<span className="text-red-500"> *</span></label>
+              <label htmlFor="signup-guardian-email" className="label">Guardian Email<span className="text-red-500"> *</span></label>
               <input
+                id="signup-guardian-email"
                 type="email"
                 value={formData.guardian_email || ''}
                 onChange={(e) => onChange('guardian_email', e.target.value)}
