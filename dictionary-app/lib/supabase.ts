@@ -9,7 +9,10 @@ import { cache } from 'react'
 // Environment variables
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+// Supabase keys never contain whitespace. The production value was pasted into
+// Vercel with line breaks in it, which made every service-role request fail
+// with "invalid header value"; stripping whitespace makes a mangled paste harmless.
+const supabaseServiceKey = (process.env.SUPABASE_SERVICE_ROLE_KEY ?? '').replace(/\s+/g, '')
 
 // Re-export client function for convenience (but prefer importing from supabase-client.ts in Client Components)
 export { createClientComponentClient } from './supabase-client'
