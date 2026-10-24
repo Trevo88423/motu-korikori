@@ -1,15 +1,68 @@
 import { requireActiveUser } from '@/lib/auth'
+import { createAdminClient } from '@/lib/supabase'
 import Link from 'next/link'
 import BlockedTermsSection from './BlockedTermsSection'
 import { verifyWord, flagWord, unflagWord, warnUser, suspendUser, banUser, reinstateUser, excludeFromAI, excludeAllContributions } from './actions'
 import RecalculateConsensusButton from './RecalculateConsensusButton'
+import AdminRoleButton from './AdminRoleButton'
 
 export const dynamic = 'force-dynamic'
 // The consensus backfill action runs from this page and can take a while
 export const maxDuration = 300
 
-export default async function AdminPage() {
-  const { supabase } = await requireActiveUser({ requireAdmin: true })
+function formatDate(value: string) {
+  return new Date(value).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+}
+
+// ilike treats % and _ as wildcards; a search for "a_b" means those letters
+function escapeLike(value: string) {
+  return value.replace(/[\\%_]/g, (c) => `\\${c}`)
+}
+
+export default async function AdminPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ member?: string | string[] }>
+}) {
+  const { supabase, profile } = await requireActiveUser({ requireAdmin: true })
+
+  // Admins and appointments (#64). is_admin and admin_appointments aren't
+  // readable with a member's key, so these go through the service role, after
+  // the admin check above.
+  const adminDb = createAdminClient()
+  const { member } = await searchParams
+  const memberQuery = (Array.isArray(member) ? member[0] : member)?.trim().slice(0, 100) ?? ''
+
+  const [{ data: admins }, { data: appointments }, { data: memberResults }] = await Promise.all([
+    adminDb
+      .from('profiles')
+      .select('id, display_name')
+      .eq('is_admin', true)
+      .order('display_name', { ascending: true }),
+    adminDb
+      .from('admin_appointments')
+      .select('user_id, appointed_at, welcomed_at, appointer:profiles!admin_appointments_appointed_by_fkey(display_name)'),
+    memberQuery
+      ? adminDb
+          .from('profiles')
+          .select('id, display_name, status, is_admin')
+          .ilike('display_name', `%${escapeLike(memberQuery)}%`)
+          .order('display_name', { ascending: true })
+          .limit(10)
+      : Promise.resolve({ data: null }),
+  ])
+
+  const appointmentFor = new Map<string, any>((appointments || []).map((a: any) => [a.user_id, a]))
+  const myAppointment = appointmentFor.get(profile.id)
+
+  // The first visit after being appointed shows a welcome, once
+  const showWelcome = !!myAppointment && !myAppointment.welcomed_at
+  if (showWelcome) {
+    await adminDb
+      .from('admin_appointments')
+      .update({ welcomed_at: new Date().toISOString() })
+      .eq('user_id', profile.id)
+  }
 
   // Fetch flagged words
   const { data: flaggedWords } = await supabase
@@ -67,6 +120,18 @@ export default async function AdminPage() {
         <p className="text-gray-600 mt-2">Moderate content and manage users</p>
       </div>
 
+      {showWelcome && (
+        <div role="status" className="mb-8 p-4 bg-primary-50 border border-primary-200 rounded-lg">
+          <h2 className="font-bold text-gray-900">Welcome, you're now an admin</h2>
+          <p className="text-sm text-gray-700 mt-1">
+            {myAppointment.appointer?.display_name ?? 'Another admin'} made you an admin on{' '}
+            {formatDate(myAppointment.appointed_at)}. From this page you can verify and unflag words,
+            warn, suspend and ban members, and appoint other admins. Most problems are handled by the
+            community's own signals; this page is for the exceptions.
+          </p>
+        </div>
+      )}
+
       {/* Tabs */}
       <div className="mb-8">
         <div className="border-b border-gray-200">
@@ -79,6 +144,9 @@ export default async function AdminPage() {
             </a>
             <a href="#inactive-users" className="border-transparent py-4 px-1 text-sm font-medium text-gray-500 hover:text-gray-700 hover:border-gray-300">
               Suspended and Banned
+            </a>
+            <a href="#admins" className="border-transparent py-4 px-1 text-sm font-medium text-gray-500 hover:text-gray-700 hover:border-gray-300">
+              Admins
             </a>
             <a href="#blocked-terms" className="border-transparent py-4 px-1 text-sm font-medium text-gray-500 hover:text-gray-700 hover:border-gray-300">
               Blocked Language
@@ -245,6 +313,82 @@ export default async function AdminPage() {
             </div>
           ) : (
             <p className="text-gray-500 text-center py-8">No suspended or banned members</p>
+          )}
+        </div>
+      </div>
+
+      {/* Admins Section */}
+      <div id="admins" className="mb-12">
+        <div className="card">
+          <h2 className="text-xl font-bold text-gray-900 mb-2">
+            Admins ({admins?.length || 0})
+          </h2>
+          <p className="text-sm text-gray-600 mb-6">
+            Admins can ban members and appoint other admins. There must always be at least one.
+          </p>
+
+          <div className="space-y-3 mb-8">
+            {(admins || []).map((admin: any) => {
+              const appointment = appointmentFor.get(admin.id)
+              return (
+                <div key={admin.id} className="p-4 bg-gray-50 border border-gray-200 rounded-lg flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <h3 className="font-bold text-gray-900">
+                      {admin.display_name}
+                      {admin.id === profile.id && <span className="font-normal text-gray-500"> (you)</span>}
+                    </h3>
+                    <p className="text-sm text-gray-600 mt-1">
+                      {appointment
+                        ? `Admin since ${formatDate(appointment.appointed_at)}, appointed by ${appointment.appointer?.display_name ?? 'a former member'}`
+                        : 'Admin from before appointments were recorded'}
+                    </p>
+                  </div>
+                  <AdminRoleButton
+                    mode="revoke"
+                    userId={admin.id}
+                    displayName={admin.display_name}
+                    isSelf={admin.id === profile.id}
+                  />
+                </div>
+              )
+            })}
+          </div>
+
+          <h3 className="font-bold text-gray-900 mb-2">Make someone an admin</h3>
+          <form method="get" action="/admin#admins" className="flex flex-wrap gap-2 mb-4">
+            <label htmlFor="member-search" className="sr-only">Member's display name</label>
+            <input
+              id="member-search"
+              type="search"
+              name="member"
+              defaultValue={memberQuery}
+              placeholder="Search by display name"
+              className="input flex-1 min-w-[12rem]"
+            />
+            <button type="submit" className="btn btn-ghost text-sm">Search</button>
+          </form>
+
+          {memberQuery && (
+            memberResults && memberResults.length > 0 ? (
+              <div className="space-y-3">
+                {memberResults.map((member: any) => (
+                  <div key={member.id} className="p-4 bg-gray-50 border border-gray-200 rounded-lg flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <h3 className="font-bold text-gray-900">{member.display_name}</h3>
+                      <p className="text-sm text-gray-600 mt-1">Status: {member.status}</p>
+                    </div>
+                    <AdminRoleButton
+                      mode="grant"
+                      userId={member.id}
+                      displayName={member.display_name}
+                      isAdmin={member.is_admin}
+                    />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-gray-500 text-sm">No members match &ldquo;{memberQuery}&rdquo;.</p>
+            )
           )}
         </div>
       </div>
