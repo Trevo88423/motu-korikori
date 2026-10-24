@@ -18,6 +18,9 @@ additional_redirect_urls = [
 # Match production: signups must click the emailed link before signing in.
 # Local emails land in Mailpit at http://127.0.0.1:54324.
 enable_confirmations = true
+# Match production: changing the password of a session older than 24 hours
+# needs reauthentication. Recovery-link sessions are always fresh (#15).
+secure_password_change = true
 
 # Auth emails: same files as production (pasted into the dashboard).
 # Edit build.py and re-run it, never the .html directly.
