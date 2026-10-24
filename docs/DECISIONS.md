@@ -3,6 +3,22 @@
 Decisions on record, and rejections, each with why and what would reopen it.
 Newest first.
 
+## 2026-10-24: Open data licence, and what search engines and AI see (Trevor, for #65)
+
+**Decided:**
+- **The community's data is licensed CC BY-SA 4.0.** That covers translations, notes, consensus meanings and recordings. Anyone may reuse it, including AI, schools and other language projects, as long as they credit the True Motu community and keep copies open (principle 7). Contributors must be told this in the Terms (#12) **before** any open download is released (principle 5).
+- **The Motu Bible text isn't ours to license.** It's © 1959–1973 Bible Society of Papua New Guinea, CC BY-NC-ND 4.0, via eBible.org. It stays out of the CC BY-SA download, is shown word-for-word with credit (#67), and is never edited. **If truemotu.org ever charges money, written permission from the Bible Society of PNG is needed first.**
+- **Search engines and AI get agreed meanings only, as "the answer."** Word pages are indexed. Pending community suggestions stay visible on the page to people, clearly labelled "not yet confirmed by speakers" (principle 3). But structured data, the API, the MCP connector and the download carry only **consensus or verified** meanings. For a pending word, an AI gets "no agreed translation yet" plus a link (principles 1 and 2).
+- AI-generated `suggested_translations` are never exposed outside the site as translations. Consent, minors and the new-contributor rules (#60 decision) apply to everything AI-facing.
+
+**Rejected:**
+- *CC BY:* lets a company take the data and close it off.
+- *CC0:* contributors get no credit.
+- *CC BY-NC:* blocks many educational and AI uses, which works against being findable.
+- *Exposing pending suggestions to crawlers and AI:* one person's guess, or Hiri Motu, would spread as fact across other AIs.
+
+**Reopen if:** consensus is so slow that almost nothing is findable after a long period. Then consider showing pending suggestions in structured data with an explicit "unconfirmed" status.
+
 ## 2026-10-24: New contributors aren't visible to the public until established (Trevor)
 
 **Decided:** entries (translations, and later proposed words) by a contributor still at

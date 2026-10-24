@@ -10,9 +10,14 @@
 -- per verse. Each row below had a heading removed only where that made the
 -- example a contiguous run of its verse's words again. Every other example
 -- already passed that check, apart from three verses WEB keeps only as a
--- footnote and 1CH 29:7 ("golddarikidia"), which have no heading. Five Motu lines that the USFM mislabels as \s1
--- (poetry in ISA 21:5, 29:16, 34:10, 64:11 and the end of MRK 12:19) are verse
--- text and were kept.
+-- footnote and 1CH 29:7 ("golddarikidia", as published). Five Motu lines
+-- that the USFM mislabels as \s1 (poetry in ISA 21:5, 29:16, 34:10, 64:11
+-- and the end of MRK 12:19) are verse text and were kept.
+--
+-- A heading is not part of the verse, so this keeps to the rule in
+-- 20261024150000 that only inserts that aren't scripture are removed: each
+-- heading goes with the one space that delimited it, and every word,
+-- punctuation mark and space of the verse stays exactly as published.
 --
 -- This is per verse, not a text rule, so it is a reviewed list rather than a
 -- change to clean_scripture_text(). Each fix applies only while the old value
