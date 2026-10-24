@@ -7,9 +7,19 @@ import { createClientComponentClient } from '@/lib/supabase-client'
 
 function VerifyEmailContent() {
   const searchParams = useSearchParams()
-  const email = searchParams.get('email') || ''
-
   const supabase = useMemo(() => createClientComponentClient(), [])
+
+  // Signup still passes ?email= (#16 covers that). Signed-in members sent here
+  // by requireActiveUser() get no address in the URL; use the session's.
+  const [sessionEmail, setSessionEmail] = useState('')
+  const email = searchParams.get('email') || sessionEmail
+
+  useEffect(() => {
+    if (searchParams.get('email')) return
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user?.email) setSessionEmail(user.email)
+    })
+  }, [supabase, searchParams])
   const [loading, setLoading] = useState(false)
   const [resendSuccess, setResendSuccess] = useState(false)
   const [error, setError] = useState('')

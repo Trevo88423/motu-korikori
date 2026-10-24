@@ -1,22 +1,11 @@
-import { redirect } from 'next/navigation'
-import { createServerComponentClient, getCurrentUserProfile, isUserAdmin } from '@/lib/supabase'
+import { requireActiveUser } from '@/lib/auth'
 import Link from 'next/link'
-import { verifyWord, flagWord, unflagWord, warnUser, suspendUser, banUser, excludeFromAI, excludeAllContributions } from './actions'
+import { verifyWord, flagWord, unflagWord, warnUser, suspendUser, banUser, reinstateUser, excludeFromAI, excludeAllContributions } from './actions'
 
 export const dynamic = 'force-dynamic'
 
 export default async function AdminPage() {
-  const profile = await getCurrentUserProfile()
-
-  if (!profile) {
-    redirect('/login')
-  }
-
-  if (!profile.is_admin) {
-    redirect('/')
-  }
-
-  const supabase = await createServerComponentClient()
+  const { supabase } = await requireActiveUser({ requireAdmin: true })
 
   // Fetch flagged words
   const { data: flaggedWords } = await supabase
@@ -33,6 +22,14 @@ export default async function AdminPage() {
     .lt('trust_score', 0.7)
     .order('trust_score', { ascending: true })
     .limit(20)
+
+  // Suspended and banned members, so they can be reinstated
+  const { data: inactiveUsers } = await supabase
+    .from('profiles')
+    .select('id, display_name, connection_type, status')
+    .in('status', ['suspended', 'banned'])
+    .order('display_name', { ascending: true })
+    .limit(50)
 
   // Fetch recent moderation log
   const { data: moderationLog } = await supabase
@@ -62,6 +59,9 @@ export default async function AdminPage() {
             </a>
             <a href="#low-trust" className="border-transparent py-4 px-1 text-sm font-medium text-gray-500 hover:text-gray-700 hover:border-gray-300">
               Low Trust Users
+            </a>
+            <a href="#inactive-users" className="border-transparent py-4 px-1 text-sm font-medium text-gray-500 hover:text-gray-700 hover:border-gray-300">
+              Suspended and Banned
             </a>
             <a href="#moderation-log" className="border-transparent py-4 px-1 text-sm font-medium text-gray-500 hover:text-gray-700 hover:border-gray-300">
               Moderation Log
@@ -183,6 +183,36 @@ export default async function AdminPage() {
             </div>
           ) : (
             <p className="text-gray-500 text-center py-8">No low trust users</p>
+          )}
+        </div>
+      </div>
+
+      {/* Suspended and Banned Section */}
+      <div id="inactive-users" className="mb-12">
+        <div className="card">
+          <h2 className="text-xl font-bold text-gray-900 mb-6">
+            Suspended and Banned ({inactiveUsers?.length || 0})
+          </h2>
+
+          {inactiveUsers && inactiveUsers.length > 0 ? (
+            <div className="space-y-4">
+              {inactiveUsers.map((user: any) => (
+                <div key={user.id} className="p-4 bg-red-50 border border-red-200 rounded-lg flex items-center justify-between">
+                  <div>
+                    <h3 className="font-bold text-gray-900">{user.display_name}</h3>
+                    <p className="text-sm text-gray-600 mt-1">Status: {user.status}</p>
+                  </div>
+                  <form action={reinstateUser}>
+                    <input type="hidden" name="userId" value={user.id} />
+                    <button type="submit" className="btn btn-ghost text-sm">
+                      Reinstate
+                    </button>
+                  </form>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-gray-500 text-center py-8">No suspended or banned members</p>
           )}
         </div>
       </div>

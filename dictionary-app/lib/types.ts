@@ -27,6 +27,7 @@ export type ModerationAction =
   | 'warn'
   | 'suspend'
   | 'ban'
+  | 'reinstate'
   | 'exclude_from_ai'
   | 'exclude_contributions'
   | 'verify_word'

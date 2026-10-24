@@ -1,5 +1,5 @@
-import { redirect } from 'next/navigation'
-import { createServerComponentClient, getCurrentUserProfile, getTotalWordCount } from '@/lib/supabase'
+import { createServerComponentClient, getTotalWordCount } from '@/lib/supabase'
+import { requireActiveUser } from '@/lib/auth'
 import ContributeClient from '@/components/ContributeClient'
 import { saveContribution } from './actions'
 import { markWordComplete } from './completion-actions'
@@ -28,48 +28,33 @@ export default async function ContributePage({
   searchParams: Promise<SearchParams>
 }) {
   const params = await searchParams
-  const supabase = await createServerComponentClient()
+
+  // The word loads alongside the access check. It's a read, and it's only used
+  // once requireActiveUser lets the member through: its redirect rejects the
+  // whole Promise.all for everyone else.
+  const wordsClient = await createServerComponentClient()
 
   // Either a specific word by ID, or the next word for the signed-in user (the
-  // function uses auth.uid()), leaving out words they skipped recently.
-  // Fetched alongside the profile; it's only used once the profile checks pass.
+  // function uses auth.uid()), leaving out words they skipped recently
   const loadWords = async () => {
     if (params.word) {
-      const result = await supabase
+      const result = await wordsClient
         .from('words')
         .select('*')
         .eq('id', params.word)
         .single()
       return { words: result.data ? [result.data] : null, wordsError: result.error }
     }
-    const result = await supabase
+    const result = await wordsClient
       .rpc('get_next_word_for_user', { exclude_ids: parseSkipped(params.skip) })
     return { words: result.data, wordsError: result.error }
   }
 
-  const [profile, totalWords, { words, wordsError }] = await Promise.all([
-    getCurrentUserProfile(),
+  const [{ supabase, profile }, totalWords, { words, wordsError }] = await Promise.all([
+    requireActiveUser(),
     getTotalWordCount(),
     loadWords(),
   ])
-
-  if (!profile) {
-    redirect('/login')
-  }
-
-  // Check if user is suspended/banned
-  if (profile.status === 'suspended' || profile.status === 'banned') {
-    return (
-      <div className="max-w-2xl mx-auto px-4 py-16 text-center">
-        <h1 className="text-3xl font-bold text-red-600 mb-4">
-          Account {profile.status === 'suspended' ? 'Suspended' : 'Banned'}
-        </h1>
-        <p className="text-gray-600">
-          Your account has been {profile.status}. Please contact support for more information.
-        </p>
-      </div>
-    )
-  }
 
   if (wordsError) {
     console.error('Error fetching next word:', wordsError)
