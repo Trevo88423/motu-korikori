@@ -34,6 +34,14 @@ const CONNECTION_WEIGHTS: Record<ConnectionType, number> = {
 }
 
 /**
+ * A gloss needs at least this many (non-excluded) contributors before it can
+ * reach consensus. Each member has at most one contribution per word, so this
+ * is a count of distinct people. Without it a single contribution has 100% of
+ * the weighted votes and would count as consensus on its own.
+ */
+export const MIN_CONSENSUS_CONTRIBUTORS = 2
+
+/**
  * Calculate weighted vote for a contribution
  */
 function calculateWeight(connectionType: ConnectionType, trustScore: number): number {
@@ -109,8 +117,8 @@ function determineConsensusStatus(groups: ContributionGroup[]): {
   const topGroup = groups[0]
   const topPercentage = topGroup.weighted_count / totalWeightedVotes
 
-  // Check if there's a clear consensus (>60% of weighted votes)
-  if (topPercentage > 0.6) {
+  // Check if there's a clear consensus (>60% of weighted votes, from enough people)
+  if (topPercentage > 0.6 && topGroup.count >= MIN_CONSENSUS_CONTRIBUTORS) {
     return {
       status: 'consensus',
       consensusGloss: topGroup.gloss,
@@ -133,11 +141,13 @@ function determineConsensusStatus(groups: ContributionGroup[]): {
     }
   }
 
-  // No clear consensus, but has contributions
+  // No clear consensus, but has contributions. consensus_gloss stays empty:
+  // the UI treats a stored gloss as "the consensus", so a leading but
+  // unconfirmed gloss mustn't be stored there.
   return {
     status: 'pending',
-    consensusGloss: topGroup.gloss,
-    consensusConfidence: topPercentage,
+    consensusGloss: null,
+    consensusConfidence: 0,
   }
 }
 
@@ -168,16 +178,32 @@ function selectConsensusAudio(
   return sorted[0].audio_url
 }
 
+type WordConsensusState = {
+  status: WordStatus
+  consensus_gloss: string | null
+  consensus_audio_url: string | null
+  consensus_confidence: number
+}
+
 /**
- * Calculate consensus for a specific word
- *
- * @param wordId - The UUID of the word to calculate consensus for
- * @returns Whether consensus was successfully calculated
+ * Recalculate one word and report whether its stored consensus changed.
+ * Returns null on error.
  */
-export async function calculateConsensus(wordId: string): Promise<boolean> {
+async function recalculateWord(wordId: string): Promise<{ changed: boolean } | null> {
   const supabase = createAdminClient()
 
   try {
+    const { data: word, error: wordError } = await supabase
+      .from('words')
+      .select('status, consensus_gloss, consensus_audio_url, consensus_confidence')
+      .eq('id', wordId)
+      .single()
+
+    if (wordError || !word) {
+      console.error('Error fetching word:', wordError)
+      return null
+    }
+
     // Fetch all contributions for this word
     const { data: contributions, error: contributionsError } = await supabase
       .from('contributions')
@@ -187,103 +213,154 @@ export async function calculateConsensus(wordId: string): Promise<boolean> {
         audio_url,
         is_excluded,
         user_id,
+        agreement_type,
+        matches_consensus,
         profile:profiles(connection_type, trust_score)
       `)
       .eq('word_id', wordId)
 
     if (contributionsError) {
       console.error('Error fetching contributions:', contributionsError)
-      return false
+      return null
     }
 
-    if (!contributions || contributions.length === 0) {
-      // No contributions yet
-      await supabase
-        .from('words')
-        .update({
-          status: 'pending',
-          consensus_gloss: null,
-          consensus_audio_url: null,
-          consensus_confidence: 0,
-        })
-        .eq('id', wordId)
-
-      return true
-    }
+    const rows = (contributions || []) as any[]
 
     // Group and analyze contributions
-    const groups = groupContributions(contributions as any)
-    const { status, consensusGloss, consensusConfidence } = determineConsensusStatus(groups)
+    const groups = groupContributions(rows)
+    let { status, consensusGloss, consensusConfidence } = determineConsensusStatus(groups)
 
-    // Select consensus audio
-    const consensusAudioUrl = selectConsensusAudio(consensusGloss, contributions as any)
-
-    // Update word status
-    const { error: updateError } = await supabase
-      .from('words')
-      .update({
-        status,
-        consensus_gloss: consensusGloss,
-        consensus_audio_url: consensusAudioUrl,
-        consensus_confidence: consensusConfidence,
-      })
-      .eq('id', wordId)
-
-    if (updateError) {
-      console.error('Error updating word:', updateError)
-      return false
-    }
-
-    // Update each contribution's matches_consensus flag
-    for (const contrib of contributions as any) {
-      if (!contrib.is_excluded) {
-        const matchesConsensus = consensusGloss !== null && contrib.english_gloss === consensusGloss
-
-        await supabase
-          .from('contributions')
-          .update({ matches_consensus: matchesConsensus })
-          .eq('id', contrib.id)
+    // An admin's "verified" stands until an admin changes it; the stored gloss
+    // still follows the leading contribution so the word shows a translation.
+    if (word.status === 'verified') {
+      status = 'verified'
+      if (groups.length > 0) {
+        const total = groups.reduce((sum, g) => sum + g.weighted_count, 0)
+        consensusGloss = groups[0].gloss
+        consensusConfidence = groups[0].weighted_count / total
+      } else {
+        consensusGloss = word.consensus_gloss
+        consensusConfidence = Number(word.consensus_confidence ?? 0)
       }
     }
 
-    return true
+    const next: WordConsensusState = {
+      status,
+      consensus_gloss: consensusGloss,
+      consensus_audio_url: selectConsensusAudio(consensusGloss, rows),
+      consensus_confidence: consensusConfidence,
+    }
+
+    const changed =
+      word.status !== next.status ||
+      word.consensus_gloss !== next.consensus_gloss ||
+      word.consensus_audio_url !== next.consensus_audio_url ||
+      Math.abs(Number(word.consensus_confidence ?? 0) - next.consensus_confidence) > 1e-6
+
+    if (changed) {
+      const { error: updateError } = await supabase
+        .from('words')
+        .update(next)
+        .eq('id', wordId)
+
+      if (updateError) {
+        console.error('Error updating word:', updateError)
+        return null
+      }
+    }
+
+    // Update each contribution's matches_consensus flag (only the ones that differ).
+    // An excluded contribution doesn't count towards consensus, so it never matches.
+    const toTrue: string[] = []
+    const toFalse: string[] = []
+    for (const contrib of rows) {
+      const matchesConsensus =
+        !contrib.is_excluded && consensusGloss !== null && contrib.english_gloss === consensusGloss
+      if (contrib.matches_consensus === matchesConsensus) continue
+      if (matchesConsensus) toTrue.push(contrib.id)
+      else toFalse.push(contrib.id)
+    }
+
+    for (const [ids, value] of [[toTrue, true], [toFalse, false]] as const) {
+      if (ids.length === 0) continue
+      const { error } = await supabase
+        .from('contributions')
+        .update({ matches_consensus: value })
+        .in('id', ids)
+      if (error) {
+        console.error('Error updating matches_consensus:', error)
+        return null
+      }
+    }
+
+    return { changed }
   } catch (error) {
     console.error('Error calculating consensus:', error)
-    return false
+    return null
   }
 }
 
 /**
- * Recalculate consensus for all words
- * This can be run as a periodic job
+ * Calculate consensus for a specific word
+ *
+ * Uses the service-role client, so callers must authorise the request first
+ * (a signed-in member whose own contribution write just succeeded, or an admin).
+ * The result depends only on the stored contributions, so running it again is harmless.
+ *
+ * @param wordId - The UUID of the word to calculate consensus for
+ * @returns Whether consensus was successfully calculated
+ */
+export async function calculateConsensus(wordId: string): Promise<boolean> {
+  return (await recalculateWord(wordId)) !== null
+}
+
+/**
+ * Recalculate consensus for every word that has at least one contribution.
+ * Run from the admin panel (backfill, or after trust scores have moved).
  */
 export async function recalculateAllConsensus(): Promise<{
   success: number
   failed: number
+  changed: number
   total: number
 }> {
   const supabase = createAdminClient()
+  const PAGE = 1000
+  const wordIds = new Set<string>()
 
-  // Fetch all word IDs
-  const { data: words } = await supabase.from('words').select('id')
-
-  if (!words) {
-    return { success: 0, failed: 0, total: 0 }
+  // PostgREST caps each response, so page through the contributions
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await supabase
+      .from('contributions')
+      .select('word_id')
+      .order('id')
+      .range(from, from + PAGE - 1)
+    if (error) throw new Error(`Failed to list contributions: ${error.message}`)
+    data.forEach((row) => wordIds.add(row.word_id))
+    if (data.length < PAGE) break
   }
 
+  const ids = Array.from(wordIds)
   let success = 0
   let failed = 0
+  let changed = 0
 
-  for (const word of words) {
-    const result = await calculateConsensus(word.id)
-    if (result) {
-      success++
-    } else {
-      failed++
+  // Small batches keep the database load modest while finishing well inside
+  // the function time limit
+  const BATCH = 10
+  for (let i = 0; i < ids.length; i += BATCH) {
+    const results = await Promise.all(ids.slice(i, i + BATCH).map(recalculateWord))
+    for (const result of results) {
+      if (result === null) {
+        failed++
+      } else {
+        success++
+        if (result.changed) changed++
+      }
     }
   }
 
-  return { success, failed, total: words.length }
+  return { success, failed, changed, total: ids.length }
 }
 
 /**

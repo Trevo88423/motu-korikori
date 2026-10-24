@@ -236,6 +236,7 @@ export interface WordCardProps {
 
 export interface ConsensusBarProps {
   contributions: ContributionGroup[];
+  status: WordStatus;
   currentConsensus: string | null;
 }
 

@@ -1,8 +1,11 @@
 import { requireActiveUser } from '@/lib/auth'
 import Link from 'next/link'
 import { verifyWord, flagWord, unflagWord, warnUser, suspendUser, banUser, reinstateUser, excludeFromAI, excludeAllContributions } from './actions'
+import RecalculateConsensusButton from './RecalculateConsensusButton'
 
 export const dynamic = 'force-dynamic'
+// The consensus backfill action runs from this page and can take a while
+export const maxDuration = 300
 
 export default async function AdminPage() {
   const { supabase } = await requireActiveUser({ requireAdmin: true })
@@ -67,6 +70,18 @@ export default async function AdminPage() {
               Moderation Log
             </a>
           </nav>
+        </div>
+      </div>
+
+      {/* Consensus Section */}
+      <div id="consensus" className="mb-12">
+        <div className="card">
+          <h2 className="text-xl font-bold text-gray-900 mb-2">Consensus</h2>
+          <p className="text-sm text-gray-600 mb-4">
+            Consensus is recalculated whenever a contribution changes. This recalculates every word
+            with contributions at once, e.g. after a deploy or when trust scores have moved.
+          </p>
+          <RecalculateConsensusButton />
         </div>
       </div>
 

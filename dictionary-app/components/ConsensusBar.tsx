@@ -1,17 +1,20 @@
 'use client'
 
 import { useState } from 'react'
-import type { ContributionGroup } from '@/lib/types'
+import type { ContributionGroup, WordStatus } from '@/lib/types'
 
 interface ConsensusBarProps {
   contributions: ContributionGroup[]
+  // The word's stored status and consensus gloss, written by lib/consensus.ts.
+  // This component only displays them, so it can't disagree with the word.
+  status: WordStatus
   currentConsensus: string | null
   wordId?: string
   onAgree?: (gloss: string) => Promise<void>
   currentUserId?: string
 }
 
-export default function ConsensusBar({ contributions, currentConsensus, wordId, onAgree, currentUserId }: ConsensusBarProps) {
+export default function ConsensusBar({ contributions, status, currentConsensus, wordId, onAgree, currentUserId }: ConsensusBarProps) {
   const [agreeLoading, setAgreeLoading] = useState<string | null>(null)
   if (contributions.length === 0) {
     return (
@@ -29,12 +32,8 @@ export default function ConsensusBar({ contributions, currentConsensus, wordId, 
   // Sort by weighted count
   const sortedContributions = [...contributions].sort((a, b) => b.weighted_count - a.weighted_count)
 
-  // Check if there's a clear consensus (>60% of weighted votes)
-  const hasConsensus = sortedContributions[0]?.weighted_count / totalWeightedVotes > 0.6
-
-  // Check if it's flagged (top 2 within 10%)
-  const isFlagged = sortedContributions.length >= 2 &&
-    Math.abs(sortedContributions[0].weighted_count - sortedContributions[1].weighted_count) / totalWeightedVotes < 0.1
+  const hasConsensus = status === 'consensus' || status === 'verified'
+  const isFlagged = status === 'flagged'
 
   return (
     <div className="space-y-4">
@@ -42,7 +41,7 @@ export default function ConsensusBar({ contributions, currentConsensus, wordId, 
         <h4 className="font-medium text-gray-900">Community Translations</h4>
         {hasConsensus && (
           <span className="px-2 py-1 text-xs font-medium bg-green-100 text-green-700 rounded">
-            Consensus Reached
+            {status === 'verified' ? 'Verified' : 'Consensus Reached'}
           </span>
         )}
         {isFlagged && (
@@ -55,7 +54,7 @@ export default function ConsensusBar({ contributions, currentConsensus, wordId, 
       <div className="space-y-3">
         {sortedContributions.map((group, index) => {
           const percentage = (group.weighted_count / totalWeightedVotes) * 100
-          const isConsensus = group.gloss === currentConsensus
+          const isConsensus = hasConsensus && group.gloss === currentConsensus
 
           return (
             <div key={index} className="space-y-1">
