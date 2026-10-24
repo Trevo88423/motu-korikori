@@ -317,7 +317,15 @@ async function recalculateWord(wordId: string): Promise<{ changed: boolean } | n
  * @returns Whether consensus was successfully calculated
  */
 export async function calculateConsensus(wordId: string): Promise<boolean> {
-  return (await recalculateWord(wordId)) !== null
+  // Callers run this after the member's own write has already succeeded, so a
+  // failure here must not surface as "your contribution failed". Log it and
+  // report false; the admin "Recalculate consensus" backfill catches up.
+  try {
+    return (await recalculateWord(wordId)) !== null
+  } catch (error) {
+    console.error(`Consensus recalculation failed for word ${wordId}:`, error)
+    return false
+  }
 }
 
 /**
