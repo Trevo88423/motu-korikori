@@ -4,6 +4,7 @@ import Link from 'next/link'
 import ConsensusBar from '@/components/ConsensusBar'
 import CommentSection from '@/components/CommentSection'
 import LinguisticAnalysis from '@/components/LinguisticAnalysis'
+import { formatReference } from '@/lib/bible-reference'
 import type { Word, ContributionWithProfile, ContributionGroup } from '@/lib/types'
 
 export const dynamic = 'force-dynamic'
@@ -215,7 +216,7 @@ export default async function WordDetailPage({
             <div className="grid md:grid-cols-2 gap-4">
               <div className="bg-primary-50 rounded-lg p-4">
                 <div className="text-xs font-medium text-primary-700 mb-2">
-                  {word.example_reference}
+                  {formatReference(word.example_reference)}
                 </div>
                 <p className="text-gray-800 italic">{word.example_motu}</p>
               </div>
