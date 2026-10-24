@@ -3,6 +3,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
+import { unstable_cache } from 'next/cache'
 import { cache } from 'react'
 
 // Environment variables
@@ -61,17 +62,34 @@ export function createAdminClient() {
 }
 
 // Total number of words in the dictionary.
-// Cached per-request so several components can call it without repeat queries.
+// It rarely changes (~15,600 words), so it's cached across requests for an hour
+// rather than counted on every page load. Words are public, so the anon key
+// without the user's cookies is enough (cookies can't be read inside unstable_cache).
+const countWords = unstable_cache(
+  async (): Promise<number> => {
+    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    })
+
+    const { count, error } = await supabase
+      .from('words')
+      .select('*', { count: 'exact', head: true })
+
+    // Throwing keeps a failed count out of the cache
+    if (error || count === null) throw new Error(error?.message || 'No word count')
+
+    return count
+  },
+  ['total-word-count'],
+  { revalidate: 3600, tags: ['total-word-count'] }
+)
+
 export const getTotalWordCount = cache(async (): Promise<number> => {
-  const supabase = await createServerComponentClient()
-
-  const { count, error } = await supabase
-    .from('words')
-    .select('*', { count: 'exact', head: true })
-
-  if (error || count === null) return 0
-
-  return count
+  try {
+    return await countWords()
+  } catch {
+    return 0
+  }
 })
 
 // Helper function to check if the current user is admin.

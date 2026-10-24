@@ -16,72 +16,75 @@ export default async function WordDetailPage({
   const { id } = await params
   const supabase = await createServerComponentClient()
 
-  // Fetch word details
-  const { data: word, error: wordError } = await supabase
-    .from('words')
-    .select('*')
-    .eq('id', id)
-    .single()
+  // Everything that only needs the word id runs at once
+  const [
+    { data: word, error: wordError },
+    { data: { user } },
+    { data: contributions },
+    { data: comments },
+  ] = await Promise.all([
+    supabase
+      .from('words')
+      .select('*')
+      .eq('id', id)
+      .single(),
+    supabase.auth.getUser(),
+    // All contributions with profile info
+    supabase
+      .from('contributions')
+      .select(`
+        *,
+        profile:profiles(display_name, connection_type, trust_score)
+      `)
+      .eq('word_id', id)
+      .order('created_at', { ascending: false }),
+    supabase
+      .from('comments')
+      .select(`
+        *,
+        profile:profiles(display_name, connection_type, trust_score)
+      `)
+      .eq('word_id', id)
+      .order('net_votes', { ascending: false }),
+  ])
 
   if (wordError || !word) {
     notFound()
   }
 
-  // Get previous and next words (by frequency for logical ordering)
-  const { data: prevWord } = await supabase
-    .from('words')
-    .select('id, motu_word')
-    .lt('frequency', word.frequency)
-    .order('frequency', { ascending: false })
-    .limit(1)
-    .single()
+  const commentIds = (comments || []).map((c) => c.id)
 
-  const { data: nextWord } = await supabase
-    .from('words')
-    .select('id, motu_word')
-    .gt('frequency', word.frequency)
-    .order('frequency', { ascending: true })
-    .limit(1)
-    .single()
+  // Previous and next words (by frequency for logical ordering) need the
+  // word's frequency; the user's comment votes need the user and comment ids
+  const [{ data: prevWord }, { data: nextWord }, { data: votes }] = await Promise.all([
+    supabase
+      .from('words')
+      .select('id, motu_word')
+      .lt('frequency', word.frequency)
+      .order('frequency', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    supabase
+      .from('words')
+      .select('id, motu_word')
+      .gt('frequency', word.frequency)
+      .order('frequency', { ascending: true })
+      .limit(1)
+      .maybeSingle(),
+    user && commentIds.length > 0
+      ? supabase
+          .from('comment_votes')
+          .select('comment_id, vote_type')
+          .eq('user_id', user.id)
+          .in('comment_id', commentIds)
+      : Promise.resolve({ data: [] as { comment_id: string; vote_type: string }[] }),
+  ])
 
-  // Get current user
-  const { data: { user } } = await supabase.auth.getUser()
-
-  // Fetch all contributions with profile info
-  const { data: contributions } = await supabase
-    .from('contributions')
-    .select(`
-      *,
-      profile:profiles(display_name, connection_type, trust_score)
-    `)
-    .eq('word_id', id)
-    .order('created_at', { ascending: false })
-
-  // Fetch comments for this word
-  const { data: comments } = await supabase
-    .from('comments')
-    .select(`
-      *,
-      profile:profiles(display_name, connection_type, trust_score)
-    `)
-    .eq('word_id', id)
-    .order('net_votes', { ascending: false })
-
-  // Get user's vote on each comment
-  const commentsWithVotes = comments ? await Promise.all(
-    comments.map(async (comment) => {
-      if (!user) return { ...comment, user_vote: null }
-
-      const { data: vote } = await supabase
-        .from('comment_votes')
-        .select('vote_type')
-        .eq('comment_id', comment.id)
-        .eq('user_id', user.id)
-        .single()
-
-      return { ...comment, user_vote: vote?.vote_type || null }
-    })
-  ) : []
+  const voteByComment = new Map((votes || []).map((v) => [v.comment_id, v.vote_type]))
+  const commentsWithVotes = (comments || []).map((comment) => ({
+    ...comment,
+    user_vote: voteByComment.get(comment.id) || null,
+  }))
 
   // Find user's own comment
   const userComment = commentsWithVotes.find(c => c.user_id === user?.id)

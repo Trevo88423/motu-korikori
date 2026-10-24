@@ -26,13 +26,13 @@ export default async function DictionaryPage({
   const perPage = 50
 
   const supabase = await createServerComponentClient()
-  const totalWords = await getTotalWordCount()
   const hasFilters = Boolean(search || englishSearch || letter || status !== 'all')
 
-  // Build query
+  // Build query. Unfiltered, the match count is just the (cached) total,
+  // so only count when filters are applied.
   let query = supabase
     .from('words')
-    .select('*', { count: 'exact' })
+    .select('*', hasFilters ? { count: 'exact' } : undefined)
 
   // Apply Motu word search filter
   if (search) {
@@ -58,9 +58,13 @@ export default async function DictionaryPage({
   const from = (page - 1) * perPage
   const to = from + perPage - 1
 
-  const { data: words, count, error } = await query
-    .order('frequency', { ascending: false })
-    .range(from, to)
+  const [totalWords, { data: words, count: filteredCount, error }] = await Promise.all([
+    getTotalWordCount(),
+    query
+      .order('frequency', { ascending: false })
+      .range(from, to),
+  ])
+  const count = hasFilters ? filteredCount : totalWords
 
   if (error) {
     console.error('Error fetching words:', error)
