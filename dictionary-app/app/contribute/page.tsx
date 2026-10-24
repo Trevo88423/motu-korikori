@@ -10,6 +10,16 @@ export const revalidate = 0 // Disable caching completely
 
 interface SearchParams {
   word?: string
+  skip?: string
+}
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const MAX_SKIPPED = 50
+
+// Recently skipped word ids arrive as ?skip=id1,id2,... (see ContributeClient)
+function parseSkipped(skip?: string): string[] {
+  if (!skip) return []
+  return skip.split(',').filter((id) => UUID_RE.test(id)).slice(0, MAX_SKIPPED)
 }
 
 export default async function ContributePage({
@@ -54,9 +64,10 @@ export default async function ContributePage({
     words = result.data ? [result.data] : null
     wordsError = result.error
   } else {
-    // Get next word for user using the database function
+    // Get next word for the signed-in user (the function uses auth.uid()),
+    // leaving out words they skipped recently
     const result = await supabase
-      .rpc('get_next_word_for_user', { user_uuid: profile.id })
+      .rpc('get_next_word_for_user', { exclude_ids: parseSkipped(params.skip) })
     words = result.data
     wordsError = result.error
   }
