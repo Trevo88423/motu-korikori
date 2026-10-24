@@ -1,7 +1,7 @@
-import { NextResponse } from 'next/server'
+import { NextResponse, type NextRequest } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   const { email, password } = await req.json()
 
   const response = NextResponse.json({ ok: true })
@@ -12,8 +12,8 @@ export async function POST(req: Request) {
     {
       cookies: {
         getAll() {
-          // no incoming cookies needed for sign-in
-          return []
+          // Pass existing cookies so @supabase/ssr can clear stale auth chunks
+          return req.cookies.getAll()
         },
         setAll(cookiesToSet) {
           cookiesToSet.forEach(({ name, value, options }) => {
