@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation'
 import WordCard from './WordCard'
 import type { Word, Contribution, ContributionFormData, ContributionWithProfile, CommentWithProfile } from '@/lib/types'
+import type { ContributionResult } from '@/app/contribute/actions'
 
 const SKIPPED_KEY = 'truemotu:skipped-words'
 const MAX_SKIPPED = 50
@@ -37,7 +38,7 @@ interface ContributeClientProps {
   allContributions: ContributionWithProfile[]
   comments: CommentWithProfile[]
   currentUserId: string
-  onSubmit: (data: ContributionFormData) => Promise<void>
+  onSubmit: (data: ContributionFormData) => Promise<ContributionResult>
   onComplete: (wordId: string) => Promise<void>
 }
 
@@ -61,11 +62,13 @@ export default function ContributeClient({
   }
 
   const handleSubmit = async (data: ContributionFormData) => {
-    await onSubmit(data)
+    const result = await onSubmit(data)
+    if (result.error) return result
     // Stay on the same word after saving - let user add comments
     // They can use the bottom buttons to navigate when ready
     router.push(`/contribute?word=${word.id}`)
     router.refresh()
+    return result
   }
 
   const handleComplete = async () => {

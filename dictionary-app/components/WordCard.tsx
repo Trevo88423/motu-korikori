@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { agreeWithTranslation } from '@/app/contribute/actions'
+import { agreeWithTranslation, type ContributionResult } from '@/app/contribute/actions'
 import { uploadAudio } from '@/lib/uploadAudio'
 import { createClientComponentClient } from '@/lib/supabase-client'
 import type { Word, Contribution, ContributionFormData, ContributionWithProfile, ContributionGroup, CommentWithProfile } from '@/lib/types'
@@ -22,7 +22,7 @@ interface WordCardProps {
   allContributions: ContributionWithProfile[]
   comments?: CommentWithProfile[]
   currentUserId?: string
-  onSubmit: (data: ContributionFormData) => Promise<void>
+  onSubmit: (data: ContributionFormData) => Promise<ContributionResult>
   onSkip?: () => void
   onComplete?: () => Promise<void>
 }
@@ -36,6 +36,7 @@ export default function WordCard({ word, userContribution, allContributions, com
   const [notes, setNotes] = useState(userContribution?.notes || '')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [glossError, setGlossError] = useState('')
   const [additionalVerses, setAdditionalVerses] = useState<AdditionalVerse[]>([])
   const [loadingVerse, setLoadingVerse] = useState(false)
   const [completingWord, setCompletingWord] = useState(false)
@@ -48,6 +49,7 @@ export default function WordCard({ word, userContribution, allContributions, com
     setConfidence(userContribution?.confidence || '')
     setNotes(userContribution?.notes || '')
     setError('')
+    setGlossError('')
     setAdditionalVerses([]) // Clear additional verses when word changes
   }, [word.id, userContribution])
 
@@ -113,7 +115,12 @@ export default function WordCard({ word, userContribution, allContributions, com
     setError('')
 
     try {
-      await agreeWithTranslation(word.id, gloss)
+      const result = await agreeWithTranslation(word.id, gloss)
+      if (result.error) {
+        setError(result.error)
+        setLoading(false)
+        return
+      }
 
       // Wait a moment for the database to fully commit
       await new Promise(resolve => setTimeout(resolve, 100))
@@ -130,6 +137,7 @@ export default function WordCard({ word, userContribution, allContributions, com
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
+    setGlossError('')
 
     // Helper function to upload audio if there's a new recording
     const getUploadedAudioUrl = async (): Promise<string | undefined> => {
@@ -171,12 +179,13 @@ export default function WordCard({ word, userContribution, allContributions, com
       try {
         const uploadedAudioUrl = await getUploadedAudioUrl()
 
-        await onSubmit({
+        const result = await onSubmit({
           word_id: word.id,
           english_gloss: userContribution.english_gloss, // Keep their agreed translation
           audio_url: uploadedAudioUrl,
           confidence: userContribution.confidence,
         })
+        if (result.error) setError(result.error)
       } catch (err: any) {
         setError(err.message || 'Failed to save audio')
       } finally {
@@ -202,12 +211,13 @@ export default function WordCard({ word, userContribution, allContributions, com
     try {
       const uploadedAudioUrl = await getUploadedAudioUrl()
 
-      await onSubmit({
+      const result = await onSubmit({
         word_id: word.id,
         english_gloss: englishGloss.trim(),
         audio_url: uploadedAudioUrl,
         confidence: confidence as 'certain' | 'somewhat_certain' | 'unsure',
       })
+      if (result.error) setGlossError(result.error)
 
       // Success! The parent component will handle navigation
     } catch (err: any) {
@@ -382,10 +392,17 @@ export default function WordCard({ word, userContribution, allContributions, com
               value={englishGloss}
               onChange={(e) => setEnglishGloss(e.target.value)}
               placeholder="e.g., house, dwelling, home"
-              className="input text-lg"
+              className={`input text-lg ${glossError ? 'border-red-500' : ''}`}
               required
               disabled={loading}
+              aria-invalid={!!glossError}
+              aria-describedby={glossError ? 'english-gloss-error' : undefined}
             />
+            {glossError && (
+              <p id="english-gloss-error" role="alert" className="text-sm text-red-600 mt-1">
+                {glossError}
+              </p>
+            )}
             <p className="text-xs text-gray-500 mt-1">
               Provide the most accurate English translation for this word
             </p>
