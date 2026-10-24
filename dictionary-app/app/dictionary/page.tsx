@@ -1,4 +1,4 @@
-import { createServerComponentClient, getTotalWordCount } from '@/lib/supabase'
+import { createServerComponentClient, getTotalWordCount, getWordInitials } from '@/lib/supabase'
 import Link from 'next/link'
 import type { Word } from '@/lib/types'
 
@@ -12,6 +12,20 @@ interface SearchParams {
   page?: string
 }
 
+// Builds a /dictionary link, leaving out empty values (and the defaults
+// status=all and page=1) so a search containing & or # survives paging.
+function dictionaryHref(params: Record<string, string | number | undefined>) {
+  const query = new URLSearchParams()
+  for (const [key, value] of Object.entries(params)) {
+    if (value === undefined || value === '') continue
+    if (key === 'status' && value === 'all') continue
+    if (key === 'page' && Number(value) === 1) continue
+    query.set(key, String(value))
+  }
+  const qs = query.toString()
+  return qs ? `/dictionary?${qs}` : '/dictionary'
+}
+
 export default async function DictionaryPage({
   searchParams,
 }: {
@@ -22,50 +36,46 @@ export default async function DictionaryPage({
   const englishSearch = params.englishSearch || ''
   const letter = params.letter || ''
   const status = params.status || 'all'
-  const page = parseInt(params.page || '1')
+  const page = Math.max(1, parseInt(params.page || '1') || 1)
   const perPage = 50
 
   const supabase = await createServerComponentClient()
   const hasFilters = Boolean(search || englishSearch || letter || status !== 'all')
 
-  // Build query. Unfiltered, the match count is just the (cached) total,
-  // so only count when filters are applied.
-  let query = supabase
-    .from('words')
-    .select('*', hasFilters ? { count: 'exact' } : undefined)
-
-  // Apply Motu word search filter
-  if (search) {
-    query = query.ilike('motu_word', `%${search}%`)
-  }
-
-  // Apply English translation search filter
-  if (englishSearch) {
-    query = query.or(`consensus_gloss.ilike.%${englishSearch}%,suggested_translations.cs.{${englishSearch}}`)
-  }
-
-  // Apply alphabet filter
-  if (letter) {
-    query = query.ilike('motu_word', `${letter}%`)
-  }
-
-  // Apply status filter
-  if (status && status !== 'all') {
-    query = query.eq('status', status)
-  }
+  // Unfiltered, the match count is just the (cached) total, so only count
+  // when filters are applied. Filters go to search_words as parameters, which
+  // escapes them; nothing the user types is put into a PostgREST filter.
+  const query = hasFilters
+    ? supabase.rpc(
+        'search_words',
+        {
+          p_motu: search || null,
+          p_english: englishSearch || null,
+          p_letter: letter || null,
+          p_status: status !== 'all' ? status : null,
+        },
+        { count: 'exact' }
+      )
+    : supabase.from('words').select('*')
 
   // Apply pagination
   const from = (page - 1) * perPage
   const to = from + perPage - 1
 
-  const [totalWords, { data: words, count: filteredCount, error }] = await Promise.all([
+  // Same order as Prev/Next on the word page (word_neighbors)
+  const [totalWords, letters, { data, count: filteredCount, error }] = await Promise.all([
     getTotalWordCount(),
+    getWordInitials(),
     query
-      .order('frequency', { ascending: false })
+      .order('frequency', { ascending: false, nullsFirst: false })
+      .order('motu_word', { ascending: true })
       .range(from, to),
   ])
+  const words = data as Word[] | null
   const count = hasFilters ? filteredCount : totalWords
 
+  // getTotalWordCount returns 0 when it fails
+  const loadError = Boolean(error) || totalWords === 0
   if (error) {
     console.error('Error fetching words:', error)
   }
@@ -101,7 +111,9 @@ export default async function DictionaryPage({
       <div className="mb-6 sm:mb-8">
         <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">True Motu Dictionary</h1>
         <p className="text-sm sm:text-base text-gray-600">
-          {hasFilters
+          {loadError
+            ? 'Search and browse the Motu dictionary'
+            : hasFilters
             ? `Showing ${(count || 0).toLocaleString()} of ${totalWords.toLocaleString()} words`
             : `Browse all ${totalWords.toLocaleString()} words in the dictionary`}
         </p>
@@ -111,17 +123,17 @@ export default async function DictionaryPage({
       <div className="card mb-4 overflow-x-auto">
         <div className="flex flex-wrap gap-1 sm:gap-2">
           <Link
-            href={`/dictionary?search=${search}&englishSearch=${englishSearch}&status=${status}`}
+            href={dictionaryHref({ search, englishSearch, status })}
             className={`px-2 sm:px-3 py-1 text-sm rounded transition ${
               !letter ? 'bg-primary-600 text-white' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
             }`}
           >
             All
           </Link>
-          {'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map((l) => (
+          {letters.map((l) => (
             <Link
               key={l}
-              href={`/dictionary?search=${search}&englishSearch=${englishSearch}&letter=${l}&status=${status}`}
+              href={dictionaryHref({ search, englishSearch, letter: l, status })}
               className={`px-2 sm:px-3 py-1 text-sm rounded transition ${
                 letter === l ? 'bg-primary-600 text-white' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
               }`}
@@ -179,7 +191,7 @@ export default async function DictionaryPage({
               <option value="flagged">Flagged</option>
             </select>
 
-            <input type="hidden" name="letter" value={letter} />
+            {letter && <input type="hidden" name="letter" value={letter} />}
 
             <button type="submit" className="btn btn-primary">
               Search
@@ -195,7 +207,14 @@ export default async function DictionaryPage({
       </div>
 
       {/* Results */}
-      {words && words.length > 0 ? (
+      {loadError ? (
+        <div className="card text-center py-12">
+          <p className="text-gray-700 font-medium">Couldn&apos;t load words, try again.</p>
+          <Link href={dictionaryHref({ search, englishSearch, letter, status, page })} className="btn btn-primary mt-4">
+            Try again
+          </Link>
+        </div>
+      ) : words && words.length > 0 ? (
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {words.map((word: Word) => {
@@ -213,7 +232,7 @@ export default async function DictionaryPage({
                         word.status === 'flagged' ? 'bg-yellow-100 text-yellow-700' :
                         'bg-gray-100 text-gray-700'
                       }`}>
-                        {word.status}
+                        {word.status.charAt(0).toUpperCase() + word.status.slice(1)}
                       </span>
                     </div>
 
@@ -260,7 +279,7 @@ export default async function DictionaryPage({
             <div className="mt-8 flex flex-col items-center gap-4">
               <div className="flex items-center gap-2 flex-wrap justify-center">
                 <Link
-                  href={`/dictionary?search=${search}&englishSearch=${englishSearch}&letter=${letter}&status=${status}&page=${Math.max(1, page - 1)}`}
+                  href={dictionaryHref({ search, englishSearch, letter, status, page: Math.max(1, page - 1) })}
                   className={`btn btn-ghost ${page === 1 ? 'opacity-50 pointer-events-none' : ''}`}
                 >
                   ← Previous
@@ -285,7 +304,7 @@ export default async function DictionaryPage({
                   return (
                     <Link
                       key={pageNum}
-                      href={`/dictionary?search=${search}&englishSearch=${englishSearch}&letter=${letter}&status=${status}&page=${pageNum}`}
+                      href={dictionaryHref({ search, englishSearch, letter, status, page: pageNum })}
                       className={`px-3 py-1 rounded transition ${
                         page === pageNum
                           ? 'bg-primary-600 text-white'
@@ -301,7 +320,7 @@ export default async function DictionaryPage({
                   <>
                     <span className="text-gray-400">...</span>
                     <Link
-                      href={`/dictionary?search=${search}&englishSearch=${englishSearch}&letter=${letter}&status=${status}&page=${totalPages}`}
+                      href={dictionaryHref({ search, englishSearch, letter, status, page: totalPages })}
                       className="px-3 py-1 rounded bg-gray-100 hover:bg-gray-200 text-gray-700"
                     >
                       {totalPages}
@@ -310,7 +329,7 @@ export default async function DictionaryPage({
                 )}
 
                 <Link
-                  href={`/dictionary?search=${search}&englishSearch=${englishSearch}&letter=${letter}&status=${status}&page=${Math.min(totalPages, page + 1)}`}
+                  href={dictionaryHref({ search, englishSearch, letter, status, page: Math.min(totalPages, page + 1) })}
                   className={`btn btn-ghost ${page === totalPages ? 'opacity-50 pointer-events-none' : ''}`}
                 >
                   Next →

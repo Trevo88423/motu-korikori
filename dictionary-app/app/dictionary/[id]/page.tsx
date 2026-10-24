@@ -54,23 +54,11 @@ export default async function WordDetailPage({
 
   const commentIds = (comments || []).map((c) => c.id)
 
-  // Previous and next words (by frequency for logical ordering) need the
-  // word's frequency; the user's comment votes need the user and comment ids
-  const [{ data: prevWord }, { data: nextWord }, { data: votes }] = await Promise.all([
-    supabase
-      .from('words')
-      .select('id, motu_word')
-      .lt('frequency', word.frequency)
-      .order('frequency', { ascending: false })
-      .limit(1)
-      .maybeSingle(),
-    supabase
-      .from('words')
-      .select('id, motu_word')
-      .gt('frequency', word.frequency)
-      .order('frequency', { ascending: true })
-      .limit(1)
-      .maybeSingle(),
+  // Previous and next words in the dictionary list's order (frequency desc,
+  // then motu_word), one at a time through ties; the user's comment votes
+  // need the user and comment ids
+  const [{ data: neighbors }, { data: votes }] = await Promise.all([
+    supabase.rpc('word_neighbors', { p_word_id: word.id }),
     user && commentIds.length > 0
       ? supabase
           .from('comment_votes')
@@ -79,6 +67,10 @@ export default async function WordDetailPage({
           .in('comment_id', commentIds)
       : Promise.resolve({ data: [] as { comment_id: string; vote_type: string }[] }),
   ])
+
+  const neighborRows = (neighbors || []) as { direction: 'prev' | 'next'; id: string; motu_word: string }[]
+  const prevWord = neighborRows.find((n) => n.direction === 'prev')
+  const nextWord = neighborRows.find((n) => n.direction === 'next')
 
   const voteByComment = new Map((votes || []).map((v) => [v.comment_id, v.vote_type]))
   const commentsWithVotes = (comments || []).map((comment) => ({

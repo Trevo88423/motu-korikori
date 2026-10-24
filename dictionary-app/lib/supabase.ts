@@ -92,6 +92,41 @@ export const getTotalWordCount = cache(async (): Promise<number> => {
   }
 })
 
+// First letters of the dictionary's words (upper-cased, as search_words
+// matches them), for the alphabet bar. Built from the data so letters with no
+// words are left out and Ḡ is included; cached like the total.
+const listWordInitials = unstable_cache(
+  async (): Promise<string[]> => {
+    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    })
+
+    const { data, error } = await supabase.rpc('word_initials')
+
+    if (error || !data) throw new Error(error?.message || 'No word initials')
+
+    // Alphabetical with Ḡ straight after G; anything that isn't a letter
+    // (the suffixes starting with "-") goes last.
+    const isLetter = (s: string) => /\p{L}/u.test(s)
+    return (data as { letter: string }[])
+      .map((row) => row.letter)
+      .filter(Boolean)
+      .sort((a, b) =>
+        isLetter(a) !== isLetter(b) ? (isLetter(a) ? -1 : 1) : a.localeCompare(b, 'en')
+      )
+  },
+  ['word-initials'],
+  { revalidate: 3600, tags: ['word-initials'] }
+)
+
+export const getWordInitials = cache(async (): Promise<string[]> => {
+  try {
+    return await listWordInitials()
+  } catch {
+    return []
+  }
+})
+
 // Helper function to check if the current user is admin.
 // is_admin isn't readable through the profiles table (column grants), so this
 // goes through the SECURITY DEFINER helper, which only answers for the caller.
