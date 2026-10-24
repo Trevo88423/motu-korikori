@@ -103,12 +103,23 @@ export default function SignupPage() {
 
   const handleNext = () => {
     if (step === 1 && validateStep1()) {
+      // Step 1 already asked for an age range; start step 2's age question
+      // from that answer instead of defaulting everyone to "under 18".
+      setFormData(prev => ({ ...prev, is_18_or_older: prev.age_range !== 'under_18' }))
       setStep(2)
+      window.scrollTo({ top: 0 })
+    } else {
+      // The button sits below the fold on phones; take the user to the first problem.
+      // Deferred so the error state has rendered before we look for it.
+      setTimeout(() => {
+        document.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus()
+      }, 0)
     }
   }
 
   const handleBack = () => {
     setStep(step - 1)
+    window.scrollTo({ top: 0 })
   }
 
   const handleSubmit = async (e: React.FormEvent) => {

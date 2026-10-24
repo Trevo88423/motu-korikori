@@ -36,20 +36,15 @@ export async function agreeWithTranslation(wordId: string, englishGloss: string)
   if (existing) {
     // If already agreed or contributed with same translation, toggle it off (remove)
     if (existing.english_gloss === englishGloss) {
-      console.log('Removing agreement:', { wordId, userId: user.id, gloss: englishGloss, contributionId: existing.id })
-
-      const { error, data: deletedData } = await supabase
+      const { error } = await supabase
         .from('contributions')
         .delete()
         .eq('id', existing.id)
-        .select()
 
       if (error) {
         console.error('Error removing agreement:', error)
         throw new Error('Failed to remove agreement')
       }
-
-      console.log('Agreement removed successfully:', deletedData)
 
       // Force revalidation of both paths
       revalidatePath('/contribute', 'page')

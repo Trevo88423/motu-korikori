@@ -133,10 +133,11 @@ export default async function DictionaryPage({
         <form className="flex flex-col gap-4">
           <div className="grid md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="search-motu" className="block text-sm font-medium text-gray-700 mb-1">
                 Search Motu Word
               </label>
               <input
+                id="search-motu"
                 type="text"
                 name="search"
                 defaultValue={search}
@@ -146,10 +147,11 @@ export default async function DictionaryPage({
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="search-english" className="block text-sm font-medium text-gray-700 mb-1">
                 Search English Translation
               </label>
               <input
+                id="search-english"
                 type="text"
                 name="englishSearch"
                 defaultValue={englishSearch}
@@ -162,6 +164,7 @@ export default async function DictionaryPage({
           <div className="flex flex-col md:flex-row gap-4">
             <select
               name="status"
+              aria-label="Filter by status"
               defaultValue={status}
               className="input md:w-48"
             >

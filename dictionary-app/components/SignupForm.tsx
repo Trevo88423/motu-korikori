@@ -36,61 +36,78 @@ export default function SignupForm({ formData, onChange, errors }: SignupFormPro
 
         <div className="space-y-4">
           <div>
-            <label className="label">
+            <label htmlFor="signup-email" className="label">
               Email<span className="text-red-500"> *</span>
             </label>
             <input
+              id="signup-email"
               type="email"
               value={formData.email}
               onChange={(e) => onChange('email', e.target.value)}
               className="input"
+              autoComplete="email"
+              aria-invalid={!!errors.email}
               required
             />
             {errors.email && <p className="text-sm text-red-600 mt-1">{errors.email}</p>}
           </div>
 
           <div>
-            <label className="label">
+            <label htmlFor="signup-password" className="label">
               Password<span className="text-red-500"> *</span>
             </label>
             <input
+              id="signup-password"
               type="password"
               value={formData.password}
               onChange={(e) => onChange('password', e.target.value)}
               className="input"
+              autoComplete="new-password"
+              aria-invalid={!!errors.password}
               required
               minLength={8}
             />
-            <p className="text-xs text-gray-500 mt-1">
-              At least 8 characters
-            </p>
+            {errors.password ? (
+              <p className="text-sm text-red-600 mt-1">{errors.password}</p>
+            ) : (
+              <p className="text-xs text-gray-500 mt-1">
+                At least 8 characters
+              </p>
+            )}
           </div>
 
           <div>
-            <label className="label">
+            <label htmlFor="signup-confirm-password" className="label">
               Confirm Password<span className="text-red-500"> *</span>
             </label>
             <input
+              id="signup-confirm-password"
               type="password"
               value={formData.confirmPassword || ''}
               onChange={(e) => onChange('confirmPassword', e.target.value)}
               className="input"
+              autoComplete="new-password"
+              aria-invalid={!!errors.confirmPassword}
               required
             />
             {errors.confirmPassword && <p className="text-sm text-red-600 mt-1">{errors.confirmPassword}</p>}
           </div>
 
           <div>
-            <label className="label">
+            <label htmlFor="signup-name" className="label">
               Full Name<span className="text-red-500"> *</span>
             </label>
             <input
+              id="signup-name"
               type="text"
               value={formData.name}
               onChange={(e) => onChange('name', e.target.value)}
               className="input"
+              autoComplete="name"
+              aria-invalid={!!errors.name}
               required
             />
+            {errors.name && <p className="text-sm text-red-600 mt-1">{errors.name}</p>}
           </div>
         </div>
       </div>
@@ -104,10 +121,12 @@ export default function SignupForm({ formData, onChange, errors }: SignupFormPro
 
         <div className="space-y-4">
           <div>
-            <label className="label">
+            <label htmlFor="signup-age-range" className="label">
               Age Range<span className="text-red-500"> *</span>
             </label>
             <select
+              id="signup-age-range"
+              aria-invalid={!!errors.age_range}
               value={formData.age_range}
               onChange={(e) => onChange('age_range', e.target.value)}
               className="input"
@@ -123,13 +142,16 @@ export default function SignupForm({ formData, onChange, errors }: SignupFormPro
               <option value="65_plus">65+</option>
               <option value="prefer_not_to_say">Prefer not to say</option>
             </select>
+            {errors.age_range && <p className="text-sm text-red-600 mt-1">{errors.age_range}</p>}
           </div>
 
           <div>
-            <label className="label">
+            <label htmlFor="signup-connection-type" className="label">
               Connection to True Motu<span className="text-red-500"> *</span>
             </label>
             <select
+              id="signup-connection-type"
+              aria-invalid={!!errors.connection_type}
               value={formData.connection_type}
               onChange={(e) => onChange('connection_type', e.target.value)}
               className="input"
@@ -143,13 +165,15 @@ export default function SignupForm({ formData, onChange, errors }: SignupFormPro
               <option value="researcher">Researcher/Linguist</option>
               <option value="other">Other</option>
             </select>
+            {errors.connection_type && <p className="text-sm text-red-600 mt-1">{errors.connection_type}</p>}
           </div>
 
           <div>
-            <label className="label">
+            <label htmlFor="signup-locations" className="label">
               Where did you learn/use True Motu? (e.g., Hanuabada, Port Moresby)
             </label>
             <input
+              id="signup-locations"
               type="text"
               placeholder="Add a location and press Enter"
               onKeyDown={(e) => {
@@ -183,10 +207,11 @@ export default function SignupForm({ formData, onChange, errors }: SignupFormPro
           </div>
 
           <div>
-            <label className="label">
+            <label htmlFor="signup-who-taught" className="label">
               Who taught you True Motu? (optional)
             </label>
             <input
+              id="signup-who-taught"
               type="text"
               value={formData.who_taught}
               onChange={(e) => onChange('who_taught', e.target.value)}

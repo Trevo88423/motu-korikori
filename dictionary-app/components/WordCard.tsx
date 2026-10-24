@@ -109,15 +109,11 @@ export default function WordCard({ word, userContribution, allContributions, com
   }
 
   const handleAgree = async (gloss: string) => {
-    console.log('handleAgree clicked for:', gloss)
-    console.log('Current userContribution:', userContribution)
-
     setLoading(true)
     setError('')
 
     try {
-      const result = await agreeWithTranslation(word.id, gloss)
-      console.log('agreeWithTranslation result:', result)
+      await agreeWithTranslation(word.id, gloss)
 
       // Wait a moment for the database to fully commit
       await new Promise(resolve => setTimeout(resolve, 100))
@@ -376,10 +372,11 @@ export default function WordCard({ word, userContribution, allContributions, com
           {(!userContribution || userContribution.agreement_type === 'full') && (
           <>
           <div>
-            <label className="label">
+            <label htmlFor="english-gloss" className="label">
               Your English Translation<span className="text-red-500"> *</span>
             </label>
             <input
+              id="english-gloss"
               type="text"
               value={englishGloss}
               onChange={(e) => setEnglishGloss(e.target.value)}

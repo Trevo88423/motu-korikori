@@ -52,7 +52,9 @@ export default async function DashboardPage() {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Welcome back, {profile.name}!</h1>
+        <h1 className="text-3xl font-bold text-gray-900">
+          {totalContributions > 0 ? `Welcome back, ${profile.name}!` : `Welcome, ${profile.name}!`}
+        </h1>
         <p className="text-gray-600 mt-2">
           {connectionTypeLabels[profile.connection_type]} • Trust Score: {profile.trust_score.toFixed(2)}
         </p>

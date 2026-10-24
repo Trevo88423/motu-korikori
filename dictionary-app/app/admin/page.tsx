@@ -85,7 +85,8 @@ export default async function AdminPage() {
                     <div>
                       <h3 className="text-xl font-bold text-gray-900">{word.motu_word}</h3>
                       <p className="text-sm text-gray-600 mt-1">
-                        {word.total_contributions} contributions from {word.unique_contributors} contributors
+                        {word.total_contributions} {word.total_contributions === 1 ? 'contribution' : 'contributions'} from{' '}
+                        {word.unique_contributors} {word.unique_contributors === 1 ? 'contributor' : 'contributors'}
                       </p>
                     </div>
                     <Link
