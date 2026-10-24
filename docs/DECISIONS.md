@@ -3,6 +3,27 @@
 Decisions on record, and rejections, each with why and what would reopen it.
 Newest first.
 
+## 2026-10-24: New contributors aren't visible to the public until established (Trevor)
+
+**Decided:** entries (translations, and later proposed words) by a contributor still at
+the **New** level of the trust ladder (#51, #53) are **hidden from signed-out visitors**.
+Signed-in members still see them, marked "new contributor", so the community can confirm
+or flag them. They become publicly visible once the contributor is **established**: they
+have reached the Member level, meaning enough of their entries were verified by
+consensus, or their trust has reached the threshold in the settings table, with no upheld
+flags.
+
+**Why:** a fresh account's first entries are the most likely to be junk or abuse, and the
+public, Google included, shouldn't see them before the community has. This serves
+principle 6 (the community filters first) and costs genuine newcomers nothing, since
+members still see and count their work.
+
+**Implemented in:** #53 (defines "established"). Visitor-facing reads apply the rule
+alongside #30 (showing contributions to visitors at all).
+
+**Reopen if:** genuine new speakers' work sits unseen too long because confirmations are
+slow. Then lower the threshold, don't remove the rule.
+
 ## 2026-10-24: Adding words and keeping it clean (approved by Trevor)
 
 **Context:** Trevor wants members to be able to add words the Bible-derived list (15,610
