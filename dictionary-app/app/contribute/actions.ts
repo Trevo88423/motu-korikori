@@ -4,12 +4,21 @@ import { revalidatePath } from 'next/cache'
 import { requireActiveUserForAction } from '@/lib/auth'
 import { calculateConsensus } from '@/lib/consensus'
 import type { ContributionFormData } from '@/lib/types'
+import {
+  BLOCKED_LANGUAGE_MESSAGE,
+  isBlockedLanguageError,
+  logBlockedLanguageAttempt,
+} from '@/lib/blocked-language'
 
 // calculateConsensus() writes with the service-role client. Each action below
 // only calls it after the signed-in member's own contribution write (checked by
 // RLS) has succeeded, and the result is derived purely from stored rows.
 
-export async function agreeWithTranslation(wordId: string, englishGloss: string) {
+// A refusal the member can act on comes back as { error } so the form can
+// show it by the field (thrown messages are hidden in production builds).
+export type ContributionResult = { error?: string; removed?: boolean }
+
+export async function agreeWithTranslation(wordId: string, englishGloss: string): Promise<ContributionResult> {
   const { supabase, user } = await requireActiveUserForAction()
 
   // Check if user already contributed to this word
@@ -55,6 +64,10 @@ export async function agreeWithTranslation(wordId: string, englishGloss: string)
       })
       .eq('id', existing.id)
 
+    if (isBlockedLanguageError(error)) {
+      await logBlockedLanguageAttempt(supabase, 'contributions', englishGloss)
+      return { error: BLOCKED_LANGUAGE_MESSAGE }
+    }
     if (error) {
       console.error('Error updating agreement:', error)
       throw new Error('Failed to update agreement')
@@ -71,6 +84,10 @@ export async function agreeWithTranslation(wordId: string, englishGloss: string)
         confidence: 'somewhat_certain'
       })
 
+    if (isBlockedLanguageError(error)) {
+      await logBlockedLanguageAttempt(supabase, 'contributions', englishGloss)
+      return { error: BLOCKED_LANGUAGE_MESSAGE }
+    }
     if (error) {
       console.error('Error adding agreement:', error)
       throw new Error('Failed to add agreement')
@@ -84,7 +101,7 @@ export async function agreeWithTranslation(wordId: string, englishGloss: string)
   return { removed: false }
 }
 
-export async function saveContribution(data: ContributionFormData) {
+export async function saveContribution(data: ContributionFormData): Promise<ContributionResult> {
   const { supabase, user } = await requireActiveUserForAction()
 
   // Check if user already has a contribution for this word
@@ -115,6 +132,10 @@ export async function saveContribution(data: ContributionFormData) {
       onConflict: 'word_id,user_id'
     })
 
+  if (isBlockedLanguageError(error)) {
+    await logBlockedLanguageAttempt(supabase, 'contributions', `${data.english_gloss} ${data.notes ?? ''}`)
+    return { error: BLOCKED_LANGUAGE_MESSAGE }
+  }
   if (error) {
     console.error('Error saving contribution:', error)
     throw new Error('Failed to save contribution')
@@ -124,4 +145,5 @@ export async function saveContribution(data: ContributionFormData) {
 
   // Revalidate the contribute page to show next word
   revalidatePath('/contribute')
+  return {}
 }

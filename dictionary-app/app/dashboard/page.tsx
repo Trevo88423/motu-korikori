@@ -2,6 +2,7 @@ import { getTotalWordCount } from '@/lib/supabase'
 import { requireActiveUser } from '@/lib/auth'
 import Link from 'next/link'
 import DisplayNameForm from './DisplayNameForm'
+import SuggestBlockedTermForm from './SuggestBlockedTermForm'
 
 export const dynamic = 'force-dynamic'
 
@@ -57,6 +58,9 @@ export default async function DashboardPage() {
       </div>
 
       <DisplayNameForm initial={profile.display_name} />
+      {(profile.connection_type === 'native_speaker' || profile.connection_type === 'heritage_speaker') && (
+        <SuggestBlockedTermForm />
+      )}
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">

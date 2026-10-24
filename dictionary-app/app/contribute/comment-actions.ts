@@ -4,12 +4,17 @@ import { revalidatePath } from 'next/cache'
 import { createServerComponentClient } from '@/lib/supabase'
 import { requireActiveUserForAction } from '@/lib/auth'
 import type { CommentFormData, VoteAction } from '@/lib/types'
+import {
+  BLOCKED_LANGUAGE_MESSAGE,
+  isBlockedLanguageError,
+  logBlockedLanguageAttempt,
+} from '@/lib/blocked-language'
 
 // ============================================================================
 // COMMENT ACTIONS
 // ============================================================================
 
-export async function addComment(data: CommentFormData) {
+export async function addComment(data: CommentFormData): Promise<{ error?: string }> {
   const { supabase, user } = await requireActiveUserForAction()
 
   // Validate comment length
@@ -26,6 +31,10 @@ export async function addComment(data: CommentFormData) {
       comment_text: data.comment_text,
     })
 
+  if (isBlockedLanguageError(error)) {
+    await logBlockedLanguageAttempt(supabase, 'comments', data.comment_text)
+    return { error: BLOCKED_LANGUAGE_MESSAGE }
+  }
   if (error) {
     if (error.code === '23505') { // Unique constraint violation
       throw new Error('You have already commented on this word. You can edit your existing comment.')
@@ -36,9 +45,10 @@ export async function addComment(data: CommentFormData) {
 
   revalidatePath('/dictionary/[id]', 'page')
   revalidatePath(`/contribute?word=${data.word_id}`, 'page')
+  return {}
 }
 
-export async function updateComment(commentId: string, commentText: string, wordId?: string) {
+export async function updateComment(commentId: string, commentText: string, wordId?: string): Promise<{ error?: string }> {
   const { supabase, user } = await requireActiveUserForAction()
 
   // Validate comment length
@@ -54,6 +64,10 @@ export async function updateComment(commentId: string, commentText: string, word
     .eq('id', commentId)
     .eq('user_id', user.id)
 
+  if (isBlockedLanguageError(error)) {
+    await logBlockedLanguageAttempt(supabase, 'comments', commentText)
+    return { error: BLOCKED_LANGUAGE_MESSAGE }
+  }
   if (error) {
     console.error('Error updating comment:', error)
     throw new Error('Failed to update comment')
@@ -63,6 +77,7 @@ export async function updateComment(commentId: string, commentText: string, word
   if (wordId) {
     revalidatePath(`/contribute?word=${wordId}`, 'page')
   }
+  return {}
 }
 
 export async function deleteComment(commentId: string, wordId?: string) {

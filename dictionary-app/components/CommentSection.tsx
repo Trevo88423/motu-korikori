@@ -35,10 +35,12 @@ export default function CommentSection({ wordId, comments, userComment, currentU
     setIsSubmitting(true)
 
     try {
-      if (userComment) {
-        await updateComment(userComment.id, commentText, wordId)
-      } else {
-        await addComment({ word_id: wordId, comment_text: commentText })
+      const result = userComment
+        ? await updateComment(userComment.id, commentText, wordId)
+        : await addComment({ word_id: wordId, comment_text: commentText })
+      if (result.error) {
+        setError(result.error)
+        return
       }
       setIsEditing(false)
       // Leave commentText as saved: the box now shows the user's own comment,
@@ -128,8 +130,10 @@ export default function CommentSection({ wordId, comments, userComment, currentU
                 onChange={(e) => setCommentText(e.target.value)}
                 placeholder="e.g., 'My bubu uses this word for...' or 'Old people say [X], young people say [Y]' or 'In my village we say...' (20-500 characters)"
                 rows={4}
-                className={`input ${!isValid && commentText.length > 0 ? 'border-red-500' : ''}`}
+                className={`input ${(!isValid && commentText.length > 0) || error ? 'border-red-500' : ''}`}
                 disabled={isSubmitting || (userComment && !isEditing)}
+                aria-invalid={!!error}
+                aria-describedby={error ? 'comment-text-error' : undefined}
               />
               <div className="flex items-center justify-between mt-1">
                 <span className={`text-xs ${characterCount < 20 ? 'text-red-600' : characterCount > 500 ? 'text-red-600' : 'text-gray-500'}`}>
@@ -144,7 +148,7 @@ export default function CommentSection({ wordId, comments, userComment, currentU
             </div>
 
             {error && (
-              <div className="p-2 bg-red-50 border border-red-200 rounded text-sm text-red-600">
+              <div id="comment-text-error" role="alert" className="p-2 bg-red-50 border border-red-200 rounded text-sm text-red-600">
                 {error}
               </div>
             )}
