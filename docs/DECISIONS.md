@@ -3,13 +3,13 @@
 Decisions on record, and rejections, each with why and what would reopen it.
 Newest first.
 
-## 2026-10-24: Adding words and keeping it clean (proposed, awaiting Trevor's approval)
+## 2026-10-24: Adding words and keeping it clean (approved by Trevor)
 
 **Context:** Trevor wants members to be able to add words the Bible-derived list (15,610
 words) is missing. His one real concern is abuse (bad language, deliberately wrong
 translations), and he doesn't want to audit content himself.
 
-**Decided (proposed):**
+**Decided:**
 - **Any signed-in member can propose a word**, but new accounts start on probation (limits
   below). This casts the widest net for the living language (principle 3).
 - **A proposed word goes live when speakers confirm it**: two trusted native or heritage
