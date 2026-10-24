@@ -11,6 +11,11 @@
 --      "+ 1:1 <note> *" (the * is all that is left of \f*).
 --   3. 110 AI suggestions with an unbalanced parenthesis.
 --
+-- Only formatting is removed. The Motu Bible is © 1959–1973 Bible Society of
+-- Papua New Guinea, CC BY-NC-ND 4.0, so no verse wording is changed, verses
+-- are never merged, and each excerpt keeps its reference. (The WEB English
+-- is public domain.)
+--
 -- Everything here is deterministic and safe to re-run: a repaired row no
 -- longer matches the repair conditions, and clean_scripture_text() leaves
 -- clean text unchanged.
@@ -229,9 +234,10 @@ BEGIN
     t := regexp_replace(t, '(\S)\s+\+\s\d+[:.]\d+(-\d+)?\s.*$', '\1');
   END IF;
 
-  -- Stray * (from \it ...\it*, \f*, "*****" separators). Between two words
-  -- ("gold *darikidia") it stood for a space.
-  t := regexp_replace(t, '\s*\*+([[:alpha:]])', ' \1', 'g');
+  -- Stray * (from \it ...\it*, \f*, "*****" separators). Removed with the
+  -- space before it, never replaced: the Motu text is CC BY-NC-ND, so its
+  -- wording stays exactly as published ("\it gold\it*darikidia" stays
+  -- "golddarikidia").
   t := regexp_replace(t, '\s*\*+', '', 'g');
   -- Whitespace: collapse, then none after an opening quote or before
   -- closing punctuation, and none inside a contraction (don’ t).
