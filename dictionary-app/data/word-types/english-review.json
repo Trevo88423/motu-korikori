@@ -1,0 +1,82 @@
+[
+  {
+    "motu_word": "age",
+    "capitalised_mid_sentence": 1,
+    "capitalised_sentence_start": 0,
+    "example_mid": "2SA.23.11",
+    "example_start": null,
+    "english_lower_case_count": 50
+  },
+  {
+    "motu_word": "here",
+    "capitalised_mid_sentence": 2,
+    "capitalised_sentence_start": 0,
+    "example_mid": "JDG.1.35",
+    "example_start": null,
+    "english_lower_case_count": 210
+  },
+  {
+    "motu_word": "king",
+    "capitalised_mid_sentence": 186,
+    "capitalised_sentence_start": 73,
+    "example_mid": "1CH.15.29",
+    "example_start": "1CH.26.32",
+    "english_lower_case_count": 2136
+  },
+  {
+    "motu_word": "lot",
+    "capitalised_mid_sentence": 30,
+    "capitalised_sentence_start": 5,
+    "example_mid": "2PE.2.7",
+    "example_start": "GEN.13.5",
+    "english_lower_case_count": 62
+  },
+  {
+    "motu_word": "more",
+    "capitalised_mid_sentence": 3,
+    "capitalised_sentence_start": 0,
+    "example_mid": "DEU.11.30",
+    "example_start": null,
+    "english_lower_case_count": 569
+  },
+  {
+    "motu_word": "put",
+    "capitalised_mid_sentence": 6,
+    "capitalised_sentence_start": 0,
+    "example_mid": "1CH.1.8",
+    "example_start": null,
+    "english_lower_case_count": 719
+  },
+  {
+    "motu_word": "queen",
+    "capitalised_mid_sentence": 16,
+    "capitalised_sentence_start": 6,
+    "example_mid": "1KI.11.19",
+    "example_start": "EST.1.16",
+    "english_lower_case_count": 48
+  },
+  {
+    "motu_word": "ram",
+    "capitalised_mid_sentence": 5,
+    "capitalised_sentence_start": 4,
+    "example_mid": "1CH.2.9",
+    "example_start": "1CH.2.10",
+    "english_lower_case_count": 80
+  },
+  {
+    "motu_word": "save",
+    "capitalised_mid_sentence": 1,
+    "capitalised_sentence_start": 0,
+    "example_mid": "GEN.14.17",
+    "example_start": null,
+    "english_lower_case_count": 118
+  },
+  {
+    "motu_word": "set",
+    "capitalised_mid_sentence": 6,
+    "capitalised_sentence_start": 3,
+    "example_mid": "1CH.1.1",
+    "example_start": "GEN.5.4",
+    "english_lower_case_count": 578
+  }
+]
