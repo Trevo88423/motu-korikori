@@ -51,7 +51,7 @@ export default function Navigation({ user }: NavigationProps) {
         <div className="flex justify-between h-14 sm:h-16 items-center">
           {/* Logo */}
           <Link href="/" className="flex-shrink-0">
-            <h1 className="text-lg sm:text-xl font-bold whitespace-nowrap">True Motu Dictionary</h1>
+            <span className="text-lg sm:text-xl font-bold whitespace-nowrap">True Motu Dictionary</span>
           </Link>
 
           {/* Desktop Navigation */}
