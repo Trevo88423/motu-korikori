@@ -1,7 +1,20 @@
 import { createServerComponentClient } from '@/lib/supabase'
 import Link from 'next/link'
+import { SITE_NAME } from '@/lib/seo'
+import type { Metadata } from 'next'
 
 export const dynamic = 'force-dynamic'
+
+const description =
+  'The speakers and learners building the True Motu (Motu korikori) dictionary, ranked by contributions. ' +
+  'True Motu is the language of the Port Moresby region, not Hiri Motu.'
+
+export const metadata: Metadata = {
+  title: 'Leaderboard',
+  description,
+  alternates: { canonical: '/leaderboard' },
+  openGraph: { type: 'website', siteName: SITE_NAME, url: '/leaderboard', title: `Leaderboard | ${SITE_NAME}`, description },
+}
 
 export default async function LeaderboardPage() {
   const supabase = await createServerComponentClient()

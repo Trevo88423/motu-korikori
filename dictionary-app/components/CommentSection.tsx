@@ -82,7 +82,7 @@ export default function CommentSection({ wordId, comments, userComment, currentU
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h3 className="font-medium text-gray-900">Community Context & Notes</h3>
+        <h2 className="font-medium text-gray-900">Community Context & Notes</h2>
         <span className="text-sm text-gray-500">{comments.length} {comments.length === 1 ? 'comment' : 'comments'}</span>
       </div>
 

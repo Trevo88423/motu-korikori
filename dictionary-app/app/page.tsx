@@ -1,5 +1,10 @@
 import Link from 'next/link'
 import { createServerComponentClient, getTotalWordCount } from '@/lib/supabase'
+import type { Metadata } from 'next'
+
+export const metadata: Metadata = {
+  alternates: { canonical: '/' },
+}
 
 export default async function Home() {
   const supabase = await createServerComponentClient()

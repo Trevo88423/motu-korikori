@@ -1,8 +1,22 @@
 import { createServerComponentClient, getTotalWordCount, getWordInitials } from '@/lib/supabase'
 import Link from 'next/link'
+import { definedTermSetJsonLd, jsonLdScript, SITE_NAME } from '@/lib/seo'
+import type { Metadata } from 'next'
 import type { Word, WordType } from '@/lib/types'
 
 export const dynamic = 'force-dynamic'
+
+const description =
+  'Browse and search every word in the True Motu (Motu korikori, ISO 639-3 meu) to English dictionary, ' +
+  'with meanings agreed by fluent speakers. True Motu is not Hiri Motu.'
+
+// Searches and pages are variations of one list, so they share its canonical URL
+export const metadata: Metadata = {
+  title: 'Browse True Motu (Motu korikori) words',
+  description,
+  alternates: { canonical: '/dictionary' },
+  openGraph: { type: 'website', siteName: SITE_NAME, url: '/dictionary', title: `Browse True Motu words | ${SITE_NAME}`, description },
+}
 
 interface SearchParams {
   search?: string
@@ -116,6 +130,7 @@ export default async function DictionaryPage({
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdScript(definedTermSetJsonLd()) }} />
       <div className="mb-6 sm:mb-8">
         <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">True Motu Dictionary</h1>
         <p className="text-sm sm:text-base text-gray-600">
@@ -255,9 +270,9 @@ export default async function DictionaryPage({
                 <div key={word.id} className="card hover:shadow-lg transition-shadow relative">
                   <Link href={`/dictionary/${word.id}`} className="block">
                     <div className="flex items-start justify-between mb-2">
-                      <h3 className="text-xl font-bold text-primary-900">
+                      <h2 lang="meu" className="text-xl font-bold text-primary-900">
                         {word.motu_word}
-                      </h3>
+                      </h2>
                       <span className={`px-2 py-1 text-xs font-medium rounded ${
                         word.status === 'verified' ? 'bg-green-100 text-green-700' :
                         word.status === 'consensus' ? 'bg-blue-100 text-blue-700' :
