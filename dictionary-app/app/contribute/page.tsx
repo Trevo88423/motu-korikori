@@ -50,11 +50,13 @@ export default async function ContributePage({
     return { words: result.data, wordsError: result.error }
   }
 
-  const [{ supabase, profile }, totalWords, { words, wordsError }] = await Promise.all([
+  const [{ supabase, profile }, wordCounts, { words, wordsError }] = await Promise.all([
     requireActiveUser(),
     getTotalWordCount(),
     loadWords(),
   ])
+  // Contribute only offers vocabulary, so progress is out of that (#75)
+  const totalWords = wordCounts.vocabulary
 
   if (wordsError) {
     console.error('Error fetching next word:', wordsError)

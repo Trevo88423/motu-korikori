@@ -5,6 +5,7 @@ import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { unstable_cache } from 'next/cache'
 import { cache } from 'react'
+import type { WordType } from './types'
 
 // Environment variables
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -64,47 +65,65 @@ export function createAdminClient() {
   })
 }
 
-// Total number of words in the dictionary.
-// It rarely changes (~15,600 words), so it's cached across requests for an hour
-// rather than counted on every page load. Words are public, so the anon key
-// without the user's cookies is enough (cookies can't be read inside unstable_cache).
+// Number of words in the dictionary, vocabulary and names separately (#75):
+// about 12,900 Motu words and 2,700 Bible names and places, which are counted
+// apart so the headline isn't inflated by names.
+// It rarely changes, so it's cached across requests for an hour rather than
+// counted on every page load. Words are public, so the anon key without the
+// user's cookies is enough (cookies can't be read inside unstable_cache).
+export interface WordCounts {
+  vocabulary: number
+  names: number
+  total: number
+}
+
 const countWords = unstable_cache(
-  async (): Promise<number> => {
+  async (): Promise<WordCounts> => {
     const supabase = createClient(supabaseUrl, supabaseAnonKey, {
       auth: { autoRefreshToken: false, persistSession: false },
     })
 
-    const { count, error } = await supabase
-      .from('words')
-      .select('*', { count: 'exact', head: true })
+    const countType = (type: WordType) =>
+      supabase.from('words').select('*', { count: 'exact', head: true }).eq('word_type', type)
+
+    const [vocabulary, names] = await Promise.all([countType('vocabulary'), countType('name')])
 
     // Throwing keeps a failed count out of the cache
-    if (error || count === null) throw new Error(error?.message || 'No word count')
+    for (const { count, error } of [vocabulary, names]) {
+      if (error || count === null) throw new Error(error?.message || 'No word count')
+    }
 
-    return count
+    return {
+      vocabulary: vocabulary.count!,
+      names: names.count!,
+      total: vocabulary.count! + names.count!,
+    }
   },
-  ['total-word-count'],
-  { revalidate: 3600, tags: ['total-word-count'] }
+  ['word-counts'],
+  { revalidate: 3600, tags: ['word-counts'] }
 )
 
-export const getTotalWordCount = cache(async (): Promise<number> => {
+const NO_COUNTS: WordCounts = { vocabulary: 0, names: 0, total: 0 }
+
+// All zero when the count fails
+export const getTotalWordCount = cache(async (): Promise<WordCounts> => {
   try {
     return await countWords()
   } catch {
-    return 0
+    return NO_COUNTS
   }
 })
 
-// First letters of the dictionary's words (upper-cased, as search_words
-// matches them), for the alphabet bar. Built from the data so letters with no
-// words are left out and Ḡ is included; cached like the total.
+// First letters of one type's words (upper-cased, as search_words matches
+// them), for the alphabet bar. Built from the data so letters with no words
+// are left out and Ḡ is included; cached like the counts.
 const listWordInitials = unstable_cache(
-  async (): Promise<string[]> => {
+  async (wordType: WordType): Promise<string[]> => {
     const supabase = createClient(supabaseUrl, supabaseAnonKey, {
       auth: { autoRefreshToken: false, persistSession: false },
     })
 
-    const { data, error } = await supabase.rpc('word_initials')
+    const { data, error } = await supabase.rpc('word_initials', { p_word_type: wordType })
 
     if (error || !data) throw new Error(error?.message || 'No word initials')
 
@@ -122,9 +141,9 @@ const listWordInitials = unstable_cache(
   { revalidate: 3600, tags: ['word-initials'] }
 )
 
-export const getWordInitials = cache(async (): Promise<string[]> => {
+export const getWordInitials = cache(async (wordType: WordType): Promise<string[]> => {
   try {
-    return await listWordInitials()
+    return await listWordInitials(wordType)
   } catch {
     return []
   }

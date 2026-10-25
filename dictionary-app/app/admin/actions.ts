@@ -1,11 +1,12 @@
 'use server'
 
-import { revalidatePath } from 'next/cache'
+import { revalidatePath, revalidateTag } from 'next/cache'
 import { headers } from 'next/headers'
 import { createAdminClient } from '@/lib/supabase'
 import { requireActiveUserForAction, AccessDeniedError } from '@/lib/auth'
 import { calculateConsensus, recalculateAllConsensus } from '@/lib/consensus'
 import { sendEmail, escapeHtml } from '@/lib/email'
+import type { WordType } from '@/lib/types'
 
 async function requireAdmin() {
   const { profile } = await requireActiveUserForAction({ requireAdmin: true })
@@ -121,6 +122,56 @@ export async function unflagWord(formData: FormData) {
 
   revalidatePath('/admin')
   revalidatePath(`/dictionary/${wordId}`)
+}
+
+export type WordTypeResult =
+  | { ok: true; wordType: WordType }
+  | { ok: false; error: string }
+
+// Mark as name / Mark as vocabulary on the word page (#75). Corrects the tag
+// set from the Bible text; the migration that set it skips any word with a
+// set_word_type entry in moderation_log, so a correction is never undone.
+export async function setWordType(wordId: string, wordType: WordType): Promise<WordTypeResult> {
+  let admin: Awaited<ReturnType<typeof requireAdmin>>
+  try {
+    admin = await requireAdmin()
+  } catch (error) {
+    if (error instanceof AccessDeniedError) return { ok: false, error: error.message }
+    throw error
+  }
+  if (typeof wordId !== 'string' || !wordId) return { ok: false, error: 'Word not found.' }
+  if (wordType !== 'name' && wordType !== 'vocabulary') return { ok: false, error: 'Unknown word type.' }
+
+  const supabase = await adminDb()
+
+  const { data: word, error } = await supabase
+    .from('words')
+    .update({ word_type: wordType })
+    .eq('id', wordId)
+    .select('motu_word')
+    .single()
+  if (error || !word) {
+    if (error) console.error('Error setting word type:', error)
+    return { ok: false, error: "That didn't work. Try again." }
+  }
+
+  const { error: logError } = await supabase
+    .from('moderation_log')
+    .insert({
+      admin_id: admin.id,
+      target_word_id: wordId,
+      action: 'set_word_type',
+      reason: wordType === 'name' ? 'Marked as name / place' : 'Marked as vocabulary',
+    })
+  if (logError) console.error('Error logging word type change:', logError)
+
+  // Counts and alphabet bars are cached per type
+  revalidateTag('word-counts')
+  revalidateTag('word-initials')
+  revalidatePath('/dictionary')
+  revalidatePath(`/dictionary/${wordId}`)
+
+  return { ok: true, wordType }
 }
 
 // User Moderation Actions

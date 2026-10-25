@@ -1,0 +1,11 @@
+{
+  "dictionary_words": 15610,
+  "never_lower_case": 3003,
+  "names": 2662,
+  "names_reviewed_by_hand": 2,
+  "near_misses": 15,
+  "sentence_start_only_kept_as_vocabulary": 333,
+  "english_looking_for_review": 10,
+  "vocabulary": 12948,
+  "dictionary_words_not_found_in_verses": 1511
+}

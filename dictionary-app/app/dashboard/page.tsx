@@ -30,7 +30,8 @@ export default async function DashboardPage() {
   const consensusRate = totalContributions > 0 ? (matchingContributions / totalContributions) * 100 : 0
 
   // Calculate progress percentage
-  const totalWords = await getTotalWordCount()
+  // Contribute only offers vocabulary, so progress is out of that (#75)
+  const totalWords = (await getTotalWordCount()).vocabulary
   const progressPercentage = totalWords > 0 ? (totalContributions / totalWords) * 100 : 0
 
   // Get streak information
