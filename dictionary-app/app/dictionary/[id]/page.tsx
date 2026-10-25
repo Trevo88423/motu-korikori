@@ -6,9 +6,48 @@ import CommentSection from '@/components/CommentSection'
 import LinguisticAnalysis from '@/components/LinguisticAnalysis'
 import FlagButton from '@/components/FlagButton'
 import { formatReference } from '@/lib/bible-reference'
+import { agreedMeaning, definedTermJsonLd, jsonLdScript, SITE_NAME, wordDescription, wordTitle } from '@/lib/seo'
+import type { Metadata } from 'next'
 import type { Word, ContributionWithProfile, ContributionGroup } from '@/lib/types'
+import { cache } from 'react'
 
 export const dynamic = 'force-dynamic'
+
+// Shared by generateMetadata and the page, so the word is read once per request
+const getWord = cache(async (id: string) => {
+  const supabase = await createServerComponentClient()
+  const { data, error } = await supabase.from('words').select('*').eq('id', id).single()
+  return error ? null : (data as Word | null)
+})
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>
+}): Promise<Metadata> {
+  const { id } = await params
+  const word = await getWord(id)
+  if (!word) return {}
+
+  const title = wordTitle(word.motu_word)
+  const description = wordDescription(word)
+  const path = `/dictionary/${word.id}`
+
+  return {
+    title,
+    description,
+    alternates: { canonical: path },
+    openGraph: {
+      type: 'article',
+      siteName: SITE_NAME,
+      url: path,
+      title: `${title} | ${SITE_NAME}`,
+      description,
+      locale: 'en',
+    },
+    twitter: { card: 'summary', title: `${title} | ${SITE_NAME}`, description },
+  }
+}
 
 export default async function WordDetailPage({
   params,
@@ -20,16 +59,12 @@ export default async function WordDetailPage({
 
   // Everything that only needs the word id runs at once
   const [
-    { data: word, error: wordError },
+    word,
     { data: { user } },
     { data: contributions },
     { data: comments },
   ] = await Promise.all([
-    supabase
-      .from('words')
-      .select('*')
-      .eq('id', id)
-      .single(),
+    getWord(id),
     supabase.auth.getUser(),
     // All contributions with profile info
     supabase
@@ -50,9 +85,12 @@ export default async function WordDetailPage({
       .order('net_votes', { ascending: false }),
   ])
 
-  if (wordError || !word) {
+  if (!word) {
     notFound()
   }
+
+  const meaning = agreedMeaning(word)
+  const jsonLd = definedTermJsonLd(word)
 
   const commentIds = (comments || []).map((c) => c.id)
 
@@ -134,6 +172,9 @@ export default async function WordDetailPage({
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      {jsonLd && (
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdScript(jsonLd) }} />
+      )}
       <div className="mb-6 flex items-center justify-between">
         <Link href="/dictionary" className="text-primary-600 hover:underline text-sm">
           ← Back to Dictionary
@@ -164,9 +205,10 @@ export default async function WordDetailPage({
       <div className="card">
         {/* Word Header */}
         <div className="text-center mb-8 pb-8 border-b">
-          <h1 className="text-5xl font-bold text-primary-900 mb-4">
+          <h1 lang="meu" className="text-5xl font-bold text-primary-900 mb-2">
             {word.motu_word}
           </h1>
+          <p className="text-sm text-gray-500 mb-4">True Motu (Motu korikori), not Hiri Motu</p>
 
           <div className="flex items-center justify-center space-x-4 text-sm text-gray-600 mb-4">
             <span>Frequency: {word.frequency.toLocaleString()}</span>
@@ -186,14 +228,14 @@ export default async function WordDetailPage({
           </span>
         </div>
 
-        {/* Consensus Translation */}
-        {word.consensus_gloss && (
+        {/* Only an agreed meaning is shown as the meaning */}
+        {meaning ? (
           <div className="mb-8 p-6 bg-green-50 border border-green-200 rounded-lg">
             <h2 className="text-sm font-medium text-green-800 mb-2">
-              Community Consensus Translation
+              {word.status === 'verified' ? 'Verified Translation' : 'Community Consensus Translation'}
             </h2>
             <p className="text-2xl font-semibold text-green-900">
-              {word.consensus_gloss}
+              {meaning}
             </p>
             {word.consensus_confidence && (
               <p className="text-sm text-green-700 mt-2">
@@ -201,12 +243,21 @@ export default async function WordDetailPage({
               </p>
             )}
           </div>
+        ) : (
+          <div className="mb-8 p-6 bg-gray-50 border border-gray-200 rounded-lg">
+            <h2 className="text-sm font-medium text-gray-700 mb-2">No agreed translation yet</h2>
+            <p className="text-gray-700">
+              {contributions && contributions.length > 0
+                ? 'Community suggestions below are not yet confirmed by speakers.'
+                : 'Speakers have not confirmed a meaning for this word.'}
+            </p>
+          </div>
         )}
 
         {/* Consensus Audio */}
         {word.consensus_audio_url && (
           <div className="mb-8">
-            <h3 className="font-medium text-gray-900 mb-2">Community Pronunciation</h3>
+            <h2 className="font-medium text-gray-900 mb-2">Community Pronunciation</h2>
             <audio src={word.consensus_audio_url} controls className="w-full" />
           </div>
         )}
@@ -214,13 +265,13 @@ export default async function WordDetailPage({
         {/* Example Verse */}
         {word.example_motu && (
           <div className="mb-8">
-            <h3 className="font-medium text-gray-900 mb-4">Example from Scripture</h3>
+            <h2 className="font-medium text-gray-900 mb-4">Example from Scripture</h2>
             <div className="grid md:grid-cols-2 gap-4">
               <div className="bg-primary-50 rounded-lg p-4">
                 <div className="text-xs font-medium text-primary-700 mb-2">
                   {formatReference(word.example_reference)}
                 </div>
-                <p className="text-gray-800 italic">{word.example_motu}</p>
+                <p lang="meu" className="text-gray-800 italic">{word.example_motu}</p>
               </div>
               <div className="bg-gray-50 rounded-lg p-4">
                 <div className="text-xs font-medium text-gray-500 mb-2">
@@ -255,9 +306,9 @@ export default async function WordDetailPage({
         {/* All Contributions */}
         {contributions && contributions.length > 0 && (
           <div id="translations">
-            <h3 className="font-medium text-gray-900 mb-4">
+            <h2 className="font-medium text-gray-900 mb-4">
               All Contributions ({contributions.length})
-            </h3>
+            </h2>
             <div className="space-y-3">
               {contributions.map((contrib: any) => (
                 <div
@@ -265,7 +316,7 @@ export default async function WordDetailPage({
                   className={`p-4 rounded-lg ${
                     contrib.is_excluded ? 'bg-red-50 border border-red-200' :
                     contrib.is_hidden ? 'bg-amber-50 border border-amber-200' :
-                    contrib.english_gloss === word.consensus_gloss ? 'bg-green-50 border border-green-200' :
+                    meaning && contrib.english_gloss === meaning ? 'bg-green-50 border border-green-200' :
                     'bg-gray-50'
                   }`}
                 >
@@ -285,10 +336,14 @@ export default async function WordDetailPage({
                             Hidden after flags, waiting for review
                           </span>
                         )}
-                        {contrib.english_gloss === word.consensus_gloss && !contrib.is_excluded && !contrib.is_hidden && (
+                        {meaning && contrib.english_gloss === meaning && !contrib.is_excluded && !contrib.is_hidden ? (
                           <svg className="w-4 h-4 text-green-600" fill="currentColor" viewBox="0 0 20 20">
                             <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                           </svg>
+                        ) : !contrib.is_excluded && !contrib.is_hidden && (
+                          <span className="px-2 py-0.5 bg-gray-100 text-gray-600 text-xs rounded">
+                            Not yet confirmed by speakers
+                          </span>
                         )}
                       </div>
 

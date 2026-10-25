@@ -3,13 +3,28 @@ import { Inter } from 'next/font/google'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import Navigation from '@/components/Navigation'
+import { SITE_DESCRIPTION, SITE_NAME, SITE_URL } from '@/lib/seo'
 import './globals.css'
 
 const inter = Inter({ subsets: ['latin'] })
 
+// Pages set their own title (filled into the template), description and canonical URL
 export const metadata: Metadata = {
-  title: 'True Motu Dictionary | Motu Korikori',
-  description: 'Crowdsourced dictionary for documenting True Motu (Motu korikori), an endangered language of Papua New Guinea',
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: `${SITE_NAME}: True Motu (Motu korikori), not Hiri Motu`,
+    template: `%s | ${SITE_NAME}`,
+  },
+  description: SITE_DESCRIPTION,
+  applicationName: SITE_NAME,
+  openGraph: {
+    type: 'website',
+    siteName: SITE_NAME,
+    title: SITE_NAME,
+    description: SITE_DESCRIPTION,
+    locale: 'en',
+  },
+  twitter: { card: 'summary', title: SITE_NAME, description: SITE_DESCRIPTION },
 }
 
 export default async function RootLayout({
