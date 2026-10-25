@@ -21,6 +21,10 @@ export type UserStatus = 'active' | 'warned' | 'suspended' | 'banned';
 
 export type WordStatus = 'pending' | 'consensus' | 'verified' | 'flagged';
 
+// 'name' is a personal or place name (mostly from the Bible), not Motu
+// vocabulary: kept out of Contribute and counted separately (#75)
+export type WordType = 'vocabulary' | 'name';
+
 export type ConfidenceLevel = 'certain' | 'somewhat_certain' | 'unsure';
 
 export type ModerationAction =
@@ -34,7 +38,10 @@ export type ModerationAction =
   | 'flag_word'
   | 'unflag_word'
   | 'restore_content'
-  | 'confirm_hide';
+  | 'confirm_hide'
+  | 'grant_admin'
+  | 'revoke_admin'
+  | 'set_word_type';
 
 // Database table types
 export interface Profile {
@@ -74,6 +81,7 @@ export interface Word {
   example_english: string | null;
   suggested_translations: string[];
   status: WordStatus;
+  word_type: WordType;
   consensus_gloss: string | null;
   consensus_audio_url: string | null;
   consensus_confidence: number;
@@ -84,6 +92,13 @@ export interface Word {
   ai_notes: string | null;
   created_at: string;
   updated_at: string;
+}
+
+// True for a personal or place name. Use this (not the raw column) wherever
+// vocabulary and names are treated differently, e.g. leaving names out of
+// structured data that presents words as Motu vocabulary (#65).
+export function isName(word: Pick<Word, 'word_type'>): boolean {
+  return word.word_type === 'name';
 }
 
 export interface Contribution {

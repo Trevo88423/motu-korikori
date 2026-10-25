@@ -2,7 +2,7 @@ import { createServerComponentClient, getTotalWordCount, getWordInitials } from 
 import Link from 'next/link'
 import { definedTermSetJsonLd, jsonLdScript, SITE_NAME } from '@/lib/seo'
 import type { Metadata } from 'next'
-import type { Word } from '@/lib/types'
+import type { Word, WordType } from '@/lib/types'
 
 export const dynamic = 'force-dynamic'
 
@@ -23,16 +23,19 @@ interface SearchParams {
   englishSearch?: string
   letter?: string
   status?: string
+  type?: string
   page?: string
 }
 
 // Builds a /dictionary link, leaving out empty values (and the defaults
-// status=all and page=1) so a search containing & or # survives paging.
+// status=all, type=vocabulary and page=1) so a search containing & or #
+// survives paging.
 function dictionaryHref(params: Record<string, string | number | undefined>) {
   const query = new URLSearchParams()
   for (const [key, value] of Object.entries(params)) {
     if (value === undefined || value === '') continue
     if (key === 'status' && value === 'all') continue
+    if (key === 'type' && value === 'vocabulary') continue
     if (key === 'page' && Number(value) === 1) continue
     query.set(key, String(value))
   }
@@ -50,14 +53,16 @@ export default async function DictionaryPage({
   const englishSearch = params.englishSearch || ''
   const letter = params.letter || ''
   const status = params.status || 'all'
+  // Vocabulary by default; Bible names and places are a separate list (#75)
+  const type: WordType = params.type === 'name' ? 'name' : 'vocabulary'
   const page = Math.max(1, parseInt(params.page || '1') || 1)
   const perPage = 50
 
   const supabase = await createServerComponentClient()
   const hasFilters = Boolean(search || englishSearch || letter || status !== 'all')
 
-  // Unfiltered, the match count is just the (cached) total, so only count
-  // when filters are applied. Filters go to search_words as parameters, which
+  // Unfiltered, the match count is just the (cached) count for the type, so
+  // only count when filters are applied. Filters go to search_words as parameters, which
   // escapes them; nothing the user types is put into a PostgREST filter.
   const query = hasFilters
     ? supabase.rpc(
@@ -67,29 +72,32 @@ export default async function DictionaryPage({
           p_english: englishSearch || null,
           p_letter: letter || null,
           p_status: status !== 'all' ? status : null,
+          p_word_type: type,
         },
         { count: 'exact' }
       )
-    : supabase.from('words').select('*')
+    : supabase.from('words').select('*').eq('word_type', type)
 
   // Apply pagination
   const from = (page - 1) * perPage
   const to = from + perPage - 1
 
   // Same order as Prev/Next on the word page (word_neighbors)
-  const [totalWords, letters, { data, count: filteredCount, error }] = await Promise.all([
+  const [wordCounts, letters, { data, count: filteredCount, error }] = await Promise.all([
     getTotalWordCount(),
-    getWordInitials(),
+    getWordInitials(type),
     query
       .order('frequency', { ascending: false, nullsFirst: false })
       .order('motu_word', { ascending: true })
       .range(from, to),
   ])
   const words = data as Word[] | null
-  const count = hasFilters ? filteredCount : totalWords
+  const typeTotal = type === 'name' ? wordCounts.names : wordCounts.vocabulary
+  const count = hasFilters ? filteredCount : typeTotal
+  const noun = type === 'name' ? 'names and places' : 'words'
 
-  // getTotalWordCount returns 0 when it fails
-  const loadError = Boolean(error) || totalWords === 0
+  // getTotalWordCount returns zeros when it fails
+  const loadError = Boolean(error) || wordCounts.total === 0
   if (error) {
     console.error('Error fetching words:', error)
   }
@@ -129,16 +137,39 @@ export default async function DictionaryPage({
           {loadError
             ? 'Search and browse the Motu dictionary'
             : hasFilters
-            ? `Showing ${(count || 0).toLocaleString()} of ${totalWords.toLocaleString()} words`
-            : `Browse all ${totalWords.toLocaleString()} words in the dictionary`}
+            ? `Showing ${(count || 0).toLocaleString()} of ${typeTotal.toLocaleString()} ${noun}`
+            : type === 'name'
+            ? `Browse ${typeTotal.toLocaleString()} personal and place names from the Motu Bible`
+            : `Browse all ${typeTotal.toLocaleString()} words in the dictionary`}
         </p>
+      </div>
+
+      {/* Words or names and places */}
+      <div className="flex gap-2 mb-4" role="tablist" aria-label="Word type">
+        {([
+          ['vocabulary', 'Words', wordCounts.vocabulary],
+          ['name', 'Names and places', wordCounts.names],
+        ] as const).map(([value, label, n]) => (
+          <Link
+            key={value}
+            role="tab"
+            aria-selected={type === value}
+            href={dictionaryHref({ search, englishSearch, status, type: value })}
+            className={`px-3 sm:px-4 py-2 text-sm font-medium rounded transition ${
+              type === value ? 'bg-primary-600 text-white' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+            }`}
+          >
+            {label}
+            {!loadError && <span className="ml-1 opacity-80">({n.toLocaleString()})</span>}
+          </Link>
+        ))}
       </div>
 
       {/* Alphabet Filter */}
       <div className="card mb-4 overflow-x-auto">
         <div className="flex flex-wrap gap-1 sm:gap-2">
           <Link
-            href={dictionaryHref({ search, englishSearch, status })}
+            href={dictionaryHref({ search, englishSearch, status, type })}
             className={`px-2 sm:px-3 py-1 text-sm rounded transition ${
               !letter ? 'bg-primary-600 text-white' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
             }`}
@@ -148,7 +179,7 @@ export default async function DictionaryPage({
           {letters.map((l) => (
             <Link
               key={l}
-              href={dictionaryHref({ search, englishSearch, letter: l, status })}
+              href={dictionaryHref({ search, englishSearch, letter: l, status, type })}
               className={`px-2 sm:px-3 py-1 text-sm rounded transition ${
                 letter === l ? 'bg-primary-600 text-white' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
               }`}
@@ -207,13 +238,14 @@ export default async function DictionaryPage({
             </select>
 
             {letter && <input type="hidden" name="letter" value={letter} />}
+            {type !== 'vocabulary' && <input type="hidden" name="type" value={type} />}
 
             <button type="submit" className="btn btn-primary">
               Search
             </button>
 
             {(search || englishSearch || letter || status !== 'all') && (
-              <Link href="/dictionary" className="btn btn-ghost">
+              <Link href={dictionaryHref({ type })} className="btn btn-ghost">
                 Clear Filters
               </Link>
             )}
@@ -225,7 +257,7 @@ export default async function DictionaryPage({
       {loadError ? (
         <div className="card text-center py-12">
           <p className="text-gray-700 font-medium">Couldn&apos;t load words, try again.</p>
-          <Link href={dictionaryHref({ search, englishSearch, letter, status, page })} className="btn btn-primary mt-4">
+          <Link href={dictionaryHref({ search, englishSearch, letter, status, type, page })} className="btn btn-primary mt-4">
             Try again
           </Link>
         </div>
@@ -294,7 +326,7 @@ export default async function DictionaryPage({
             <div className="mt-8 flex flex-col items-center gap-4">
               <div className="flex items-center gap-2 flex-wrap justify-center">
                 <Link
-                  href={dictionaryHref({ search, englishSearch, letter, status, page: Math.max(1, page - 1) })}
+                  href={dictionaryHref({ search, englishSearch, letter, status, type, page: Math.max(1, page - 1) })}
                   className={`btn btn-ghost ${page === 1 ? 'opacity-50 pointer-events-none' : ''}`}
                 >
                   ← Previous
@@ -319,7 +351,7 @@ export default async function DictionaryPage({
                   return (
                     <Link
                       key={pageNum}
-                      href={dictionaryHref({ search, englishSearch, letter, status, page: pageNum })}
+                      href={dictionaryHref({ search, englishSearch, letter, status, type, page: pageNum })}
                       className={`px-3 py-1 rounded transition ${
                         page === pageNum
                           ? 'bg-primary-600 text-white'
@@ -335,7 +367,7 @@ export default async function DictionaryPage({
                   <>
                     <span className="text-gray-400">...</span>
                     <Link
-                      href={dictionaryHref({ search, englishSearch, letter, status, page: totalPages })}
+                      href={dictionaryHref({ search, englishSearch, letter, status, type, page: totalPages })}
                       className="px-3 py-1 rounded bg-gray-100 hover:bg-gray-200 text-gray-700"
                     >
                       {totalPages}
@@ -344,7 +376,7 @@ export default async function DictionaryPage({
                 )}
 
                 <Link
-                  href={dictionaryHref({ search, englishSearch, letter, status, page: Math.min(totalPages, page + 1) })}
+                  href={dictionaryHref({ search, englishSearch, letter, status, type, page: Math.min(totalPages, page + 1) })}
                   className={`btn btn-ghost ${page === totalPages ? 'opacity-50 pointer-events-none' : ''}`}
                 >
                   Next →
@@ -352,14 +384,14 @@ export default async function DictionaryPage({
               </div>
 
               <div className="text-sm text-gray-600">
-                Page {page} of {totalPages} ({count?.toLocaleString()} words)
+                Page {page} of {totalPages} ({count?.toLocaleString()} {noun})
               </div>
             </div>
           )}
         </>
       ) : (
         <div className="card text-center py-12">
-          <p className="text-gray-500">No words found matching your search.</p>
+          <p className="text-gray-500">No {noun} found matching your search.</p>
         </div>
       )}
     </div>

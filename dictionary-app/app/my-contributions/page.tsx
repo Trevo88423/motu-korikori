@@ -6,7 +6,8 @@ export const dynamic = 'force-dynamic'
 
 export default async function MyContributionsPage() {
   const { supabase, profile } = await requireActiveUser()
-  const totalWords = await getTotalWordCount()
+  // Contribute only offers vocabulary, so progress is out of that (#75)
+  const totalWords = (await getTotalWordCount()).vocabulary
 
   // Get user's contributions with word details
   const { data: contributions } = await supabase

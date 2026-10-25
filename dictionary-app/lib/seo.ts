@@ -2,6 +2,7 @@
 // Only consensus or verified meanings are published as "the" meaning. Pending
 // community suggestions and the AI suggested_translations never are.
 
+import { isName } from './types'
 import type { Word } from './types'
 
 export const SITE_URL = 'https://truemotu.org'
@@ -23,11 +24,9 @@ export function agreedMeaning(word: Pick<Word, 'status' | 'consensus_gloss'>): s
   return word.consensus_gloss?.trim() || null
 }
 
-// #75 adds words.word_type ('vocabulary' | 'name'). Until that column exists,
-// every word is vocabulary.
-export function isName(word: object): boolean {
-  return (word as { word_type?: string | null }).word_type === 'name'
-}
+// Bible personal and place names (words.word_type = 'name', #75) get no
+// structured data: they aren't Motu vocabulary
+export { isName }
 
 export function wordUrl(id: string): string {
   return `${SITE_URL}/dictionary/${id}`

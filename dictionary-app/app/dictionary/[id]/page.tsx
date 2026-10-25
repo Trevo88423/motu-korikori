@@ -1,4 +1,4 @@
-import { createServerComponentClient } from '@/lib/supabase'
+import { createServerComponentClient, isUserAdmin } from '@/lib/supabase'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import ConsensusBar from '@/components/ConsensusBar'
@@ -8,6 +8,8 @@ import FlagButton from '@/components/FlagButton'
 import { formatReference } from '@/lib/bible-reference'
 import { agreedMeaning, definedTermJsonLd, jsonLdScript, SITE_NAME, wordDescription, wordTitle } from '@/lib/seo'
 import type { Metadata } from 'next'
+import WordTypeButton from './WordTypeButton'
+import { isName } from '@/lib/types'
 import type { Word, ContributionWithProfile, ContributionGroup } from '@/lib/types'
 import { cache } from 'react'
 
@@ -96,8 +98,9 @@ export default async function WordDetailPage({
 
   // Previous and next words in the dictionary list's order (frequency desc,
   // then motu_word), one at a time through ties; the user's comment votes
-  // need the user and comment ids
-  const [{ data: neighbors }, { data: votes }] = await Promise.all([
+  // need the user and comment ids. Prev/Next stay within the word's type
+  // (vocabulary, or names and places).
+  const [{ data: neighbors }, { data: votes }, isAdmin] = await Promise.all([
     supabase.rpc('word_neighbors', { p_word_id: word.id }),
     user && commentIds.length > 0
       ? supabase
@@ -106,7 +109,9 @@ export default async function WordDetailPage({
           .eq('user_id', user.id)
           .in('comment_id', commentIds)
       : Promise.resolve({ data: [] as { comment_id: string; vote_type: string }[] }),
+    user ? isUserAdmin() : Promise.resolve(false),
   ])
+  const wordIsName = isName(word)
 
   const neighborRows = (neighbors || []) as { direction: 'prev' | 'next'; id: string; motu_word: string }[]
   const prevWord = neighborRows.find((n) => n.direction === 'prev')
@@ -176,8 +181,11 @@ export default async function WordDetailPage({
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdScript(jsonLd) }} />
       )}
       <div className="mb-6 flex items-center justify-between">
-        <Link href="/dictionary" className="text-primary-600 hover:underline text-sm">
-          ← Back to Dictionary
+        <Link
+          href={wordIsName ? '/dictionary?type=name' : '/dictionary'}
+          className="text-primary-600 hover:underline text-sm"
+        >
+          {wordIsName ? '← Back to Names and places' : '← Back to Dictionary'}
         </Link>
 
         <div className="flex items-center gap-2">
@@ -226,6 +234,21 @@ export default async function WordDetailPage({
           }`}>
             {word.status.charAt(0).toUpperCase() + word.status.slice(1)}
           </span>
+
+          {wordIsName && (
+            <span
+              className="inline-block ml-2 px-3 py-1 text-sm font-medium rounded bg-amber-100 text-amber-800"
+              title="A personal or place name, mostly from the Bible, not Motu vocabulary"
+            >
+              Name / place
+            </span>
+          )}
+
+          {isAdmin && (
+            <div className="mt-4">
+              <WordTypeButton wordId={word.id} wordType={word.word_type} />
+            </div>
+          )}
         </div>
 
         {/* Only an agreed meaning is shown as the meaning */}
