@@ -1,13 +1,14 @@
 'use client'
 
-import { useState } from 'react'
+import type { AgeRange } from '@/lib/types'
 
 interface ConsentFormProps {
   formData: {
     consent_tos: boolean
     consent_dictionary: boolean
     consent_ai_training: boolean
-    is_18_or_older: boolean
+    age_range: AgeRange | ''
+    is_18_or_older: boolean | null
     guardian_name?: string
     guardian_email?: string
   }
@@ -81,41 +82,41 @@ export default function ConsentForm({ formData, onChange }: ConsentFormProps) {
         </label>
       </div>
 
+      {/* Adult or minor comes from the step 1 age range. Only "Prefer not to
+          say" needs asking, and the database derives it the same way. */}
+      {(formData.age_range === 'prefer_not_to_say' || formData.is_18_or_older === false) && (
       <div className="border-t pt-6 mt-6">
-        <h4 className="font-medium mb-4">Age Verification</h4>
+        {formData.age_range === 'prefer_not_to_say' && (
+          <fieldset>
+            <legend className="font-medium mb-4">
+              Are you 18 or older?<span className="text-red-500"> *</span>
+            </legend>
+            <div className="space-y-3">
+              <label className="flex items-center space-x-3 cursor-pointer">
+                <input
+                  type="radio"
+                  name="age_verification"
+                  checked={formData.is_18_or_older === true}
+                  onChange={() => onChange('is_18_or_older', true)}
+                  className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300"
+                  required
+                />
+                <span className="text-sm text-gray-700">Yes, I am 18 or older</span>
+              </label>
 
-        <div className="space-y-3">
-          <label className="flex items-center space-x-3 cursor-pointer">
-            <input
-              type="radio"
-              name="age_verification"
-              checked={formData.is_18_or_older === true}
-              onChange={() => {
-                onChange('is_18_or_older', true)
-                onChange('guardian_name', '')
-                onChange('guardian_email', '')
-              }}
-              className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300"
-              required
-            />
-            <span className="text-sm text-gray-700">
-              I am 18 years of age or older
-            </span>
-          </label>
-
-          <label className="flex items-center space-x-3 cursor-pointer">
-            <input
-              type="radio"
-              name="age_verification"
-              checked={formData.is_18_or_older === false && (formData.guardian_name !== undefined)}
-              onChange={() => onChange('is_18_or_older', false)}
-              className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300"
-            />
-            <span className="text-sm text-gray-700">
-              I am under 18 (requires guardian consent)
-            </span>
-          </label>
-        </div>
+              <label className="flex items-center space-x-3 cursor-pointer">
+                <input
+                  type="radio"
+                  name="age_verification"
+                  checked={formData.is_18_or_older === false}
+                  onChange={() => onChange('is_18_or_older', false)}
+                  className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300"
+                />
+                <span className="text-sm text-gray-700">No, I am under 18</span>
+              </label>
+            </div>
+          </fieldset>
+        )}
 
         {formData.is_18_or_older === false && (
           <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-md space-y-4">
@@ -149,6 +150,7 @@ export default function ConsentForm({ formData, onChange }: ConsentFormProps) {
           </div>
         )}
       </div>
+      )}
     </div>
   )
 }

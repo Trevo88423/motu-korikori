@@ -30,7 +30,8 @@ export default function SignupPage() {
     consent_tos: false,
     consent_dictionary: false,
     consent_ai_training: false,
-    is_18_or_older: false,
+    // Set from age_range when leaving step 1; null means not answered yet.
+    is_18_or_older: null as boolean | null,
     guardian_name: '',
     guardian_email: '',
     guardian_consent: false,
@@ -94,7 +95,11 @@ export default function SignupPage() {
       newErrors.consent_ai_training = 'You must consent to AI training usage'
     }
 
-    if (!formData.is_18_or_older && (!formData.guardian_name || !formData.guardian_email)) {
+    if (formData.is_18_or_older === null) {
+      newErrors.age = 'Please tell us whether you are 18 or older'
+    }
+
+    if (formData.is_18_or_older === false && (!formData.guardian_name.trim() || !formData.guardian_email.trim())) {
       newErrors.guardian = 'Guardian information is required for users under 18'
     }
 
@@ -104,9 +109,12 @@ export default function SignupPage() {
 
   const handleNext = () => {
     if (step === 1 && validateStep1()) {
-      // Step 1 already asked for an age range; start step 2's age question
-      // from that answer instead of defaulting everyone to "under 18".
-      setFormData(prev => ({ ...prev, is_18_or_older: prev.age_range !== 'under_18' }))
+      // Adult or minor follows the age range (the signup trigger derives it the
+      // same way). Only "Prefer not to say" leaves it for step 2 to ask.
+      setFormData(prev => ({
+        ...prev,
+        is_18_or_older: prev.age_range === 'prefer_not_to_say' ? null : prev.age_range !== 'under_18',
+      }))
       setStep(2)
       window.scrollTo({ top: 0 })
     } else {
@@ -153,8 +161,9 @@ export default function SignupPage() {
             consent_dictionary: formData.consent_dictionary,
             consent_ai_training: formData.consent_ai_training,
             is_18_or_older: formData.is_18_or_older,
-            guardian_name: formData.guardian_name || '',
-            guardian_email: formData.guardian_email || '',
+            // Only a minor has a guardian; don't keep details typed before switching.
+            guardian_name: formData.is_18_or_older ? '' : formData.guardian_name,
+            guardian_email: formData.is_18_or_older ? '' : formData.guardian_email,
           },
         },
       })
@@ -237,9 +246,11 @@ export default function SignupPage() {
                 </div>
               )}
 
-              {Object.keys(errors).some(key => key.startsWith('consent') || key === 'guardian') && (
+              {Object.keys(errors).some(key => key.startsWith('consent') || key === 'guardian' || key === 'age') && (
                 <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-md">
-                  <p className="text-sm text-red-600">Please complete all required consents</p>
+                  <p className="text-sm text-red-600">
+                    {errors.age || errors.guardian || 'Please complete all required consents'}
+                  </p>
                 </div>
               )}
 
