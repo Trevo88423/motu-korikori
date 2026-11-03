@@ -69,11 +69,13 @@ export default async function WordDetailPage({
   ] = await Promise.all([
     getWord(id),
     supabase.auth.getUser(),
-    // All contributions with profile info
+    // Contributions with profile info. Visitors get only the public ones (#30),
+    // and only the columns granted to anon, so name them rather than *
     supabase
       .from('contributions')
       .select(`
-        *,
+        id, word_id, user_id, english_gloss, audio_url, confidence, notes,
+        is_excluded, is_hidden, agreement_type, created_at,
         profile:profiles(display_name, connection_type, trust_score)
       `)
       .eq('word_id', id)
@@ -126,6 +128,12 @@ export default async function WordDetailPage({
 
   // Find user's own comment
   const userComment = commentsWithVotes.find(c => c.user_id === user?.id)
+
+  // The header counts every visible entry; a visitor is shown only the public
+  // ones, so say how many more members can see
+  const membersOnlyCount = user
+    ? 0
+    : Math.max(0, word.total_contributions - (contributions || []).length)
 
   // Group contributions for consensus display
   const contributionGroups: ContributionGroup[] = []
@@ -405,7 +413,22 @@ export default async function WordDetailPage({
           </div>
         )}
 
-        {(!contributions || contributions.length === 0) && (
+        {/* Visitors don't see entries from new contributors, or from members
+            who haven't consented to the public dictionary (#30) */}
+        {membersOnlyCount > 0 && (
+          <div className="text-center py-6 text-gray-500">
+            <p>
+              {membersOnlyCount} {contributions && contributions.length > 0 ? 'more ' : ''}
+              {membersOnlyCount === 1 ? 'suggestion is' : 'suggestions are'} visible to members
+              while the community checks {membersOnlyCount === 1 ? 'it' : 'them'}.
+            </p>
+            <Link href="/login" className="btn btn-secondary mt-4">
+              Log in to see {membersOnlyCount === 1 ? 'it' : 'them'}
+            </Link>
+          </div>
+        )}
+
+        {(!contributions || contributions.length === 0) && membersOnlyCount === 0 && (
           <div className="text-center py-8 text-gray-500">
             <p>No contributions yet for this word.</p>
             <Link href={`/contribute?word=${word.id}`} className="btn btn-primary mt-4">
