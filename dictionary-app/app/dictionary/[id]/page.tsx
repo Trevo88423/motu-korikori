@@ -6,6 +6,7 @@ import CommentSection from '@/components/CommentSection'
 import LinguisticAnalysis from '@/components/LinguisticAnalysis'
 import FlagButton from '@/components/FlagButton'
 import { formatReference } from '@/lib/bible-reference'
+import BibleCredit from '@/components/BibleCredit'
 import { agreedMeaning, definedTermJsonLd, jsonLdScript, SITE_NAME, wordDescription, wordTitle } from '@/lib/seo'
 import type { Metadata } from 'next'
 import WordTypeButton from './WordTypeButton'
@@ -303,6 +304,7 @@ export default async function WordDetailPage({
                 <p className="text-gray-700">{word.example_english}</p>
               </div>
             </div>
+            <BibleCredit />
           </div>
         )}
 

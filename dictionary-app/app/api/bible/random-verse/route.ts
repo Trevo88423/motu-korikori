@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import BibleQuery from '@/lib/bible-query'
+import { BIBLE_CREDIT, BIBLE_CREDIT_TEXT } from '@/lib/bible-credit'
 
 export const dynamic = 'force-dynamic'
 
@@ -41,7 +42,12 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       ref: verse.ref,
       motu: verse.motu,
-      english: verse.english
+      english: verse.english,
+      // The licence requires the credit wherever the verse is shown (#67)
+      attribution: BIBLE_CREDIT_TEXT,
+      license: BIBLE_CREDIT.licence,
+      license_url: BIBLE_CREDIT.licenceUrl,
+      source_url: BIBLE_CREDIT.sourceUrl,
     })
   } catch (error: any) {
     console.error('Error in random-verse API:', error)

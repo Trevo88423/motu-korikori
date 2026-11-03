@@ -58,6 +58,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: SITE_URL, lastModified, changeFrequency: 'daily', priority: 1 },
     { url: `${SITE_URL}/dictionary`, lastModified, changeFrequency: 'daily', priority: 0.9 },
     { url: `${SITE_URL}/leaderboard`, changeFrequency: 'daily', priority: 0.3 },
+    { url: `${SITE_URL}/sources`, changeFrequency: 'yearly', priority: 0.2 },
     ...words.map((w) => ({
       url: `${SITE_URL}/dictionary/${w.id}`,
       lastModified: new Date(w.updated_at),

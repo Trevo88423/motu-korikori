@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { agreeWithTranslation, type ContributionResult } from '@/app/contribute/actions'
 import { uploadAudio } from '@/lib/uploadAudio'
 import { formatReference } from '@/lib/bible-reference'
+import BibleCredit from '@/components/BibleCredit'
 import { createClientComponentClient } from '@/lib/supabase-client'
 import type { Word, Contribution, ContributionFormData, ContributionWithProfile, ContributionGroup, CommentWithProfile } from '@/lib/types'
 import ConsensusBar from './ConsensusBar'
@@ -342,6 +343,7 @@ export default function WordCard({ word, userContribution, allContributions, com
                 </div>
               </div>
             ))}
+            <BibleCredit />
           </div>
         )}
 

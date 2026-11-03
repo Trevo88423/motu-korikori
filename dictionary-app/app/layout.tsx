@@ -2,8 +2,10 @@ import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
+import Link from 'next/link'
 import Navigation from '@/components/Navigation'
 import { SITE_DESCRIPTION, SITE_NAME, SITE_URL } from '@/lib/seo'
+import { BIBLE_CREDIT_TEXT } from '@/lib/bible-credit'
 import './globals.css'
 
 const inter = Inter({ subsets: ['latin'] })
@@ -87,6 +89,12 @@ export default async function RootLayout({
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <p className="text-center text-gray-400">
               &copy; {new Date().getFullYear()} True Motu Dictionary Project. Preserving Motu korikori for future generations.
+            </p>
+            <p className="text-center text-gray-400 text-xs mt-3">
+              {BIBLE_CREDIT_TEXT}{' '}
+              <Link href="/sources" className="underline hover:text-white">
+                Sources
+              </Link>
             </p>
           </div>
         </footer>
