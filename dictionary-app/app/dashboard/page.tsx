@@ -3,6 +3,7 @@ import { requireActiveUser } from '@/lib/auth'
 import Link from 'next/link'
 import DisplayNameForm from './DisplayNameForm'
 import SuggestBlockedTermForm from './SuggestBlockedTermForm'
+import { TRUST_LEVEL_HINTS, TRUST_LEVEL_LABELS } from '@/lib/trust'
 
 export const dynamic = 'force-dynamic'
 
@@ -54,8 +55,9 @@ export default async function DashboardPage() {
           {totalContributions > 0 ? `Welcome back, ${profile.display_name}!` : `Welcome, ${profile.display_name}!`}
         </h1>
         <p className="text-gray-600 mt-2">
-          {connectionTypeLabels[profile.connection_type]} • Trust Score: {profile.trust_score.toFixed(2)}
+          {connectionTypeLabels[profile.connection_type]} • {TRUST_LEVEL_LABELS[profile.trust_level]} • Trust Score: {profile.trust_score.toFixed(2)}
         </p>
+        <p className="text-sm text-gray-500 mt-1">{TRUST_LEVEL_HINTS[profile.trust_level]}</p>
       </div>
 
       <DisplayNameForm initial={profile.display_name} />

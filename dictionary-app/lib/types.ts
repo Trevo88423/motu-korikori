@@ -21,6 +21,9 @@ export type UserStatus = 'active' | 'warned' | 'suspended' | 'banned';
 
 export type WordStatus = 'pending' | 'consensus' | 'verified' | 'flagged';
 
+// The trust ladder (#53), recomputed in the database from the member's record
+export type TrustLevel = 'new' | 'member' | 'trusted_speaker' | 'restricted';
+
 // 'name' is a personal or place name (mostly from the Bible), not Motu
 // vocabulary: kept out of Contribute and counted separately (#75)
 export type WordType = 'vocabulary' | 'name';
@@ -59,8 +62,10 @@ export interface Profile {
   is_18_or_older: boolean;
   guardian_name: string | null;
   guardian_email: string | null;
-  trust_score: number;
-  contribution_count: number;
+  trust_score: number; // what the member counts for: record score x level weight
+  trust_level: TrustLevel;
+  restricted_until: string | null; // private; set by auto-restriction (#57)
+  contribution_count: number; // distinct words translated or commented on
   consensus_rate: number;
   streak_days: number;
   last_contribution_date: string | null;

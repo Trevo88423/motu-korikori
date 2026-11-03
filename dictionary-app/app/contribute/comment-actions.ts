@@ -1,7 +1,6 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { createServerComponentClient } from '@/lib/supabase'
 import { requireActiveUserForAction } from '@/lib/auth'
 import type { CommentFormData, VoteAction } from '@/lib/types'
 import {
@@ -161,8 +160,8 @@ export async function voteOnComment(action: VoteAction, wordId?: string) {
     }
   }
 
-  // Update user's trust score based on vote weight
-  await updateTrustScoreForVote(user.id, action.vote_type, 'comment')
+  // Trust isn't touched here: the database recomputes the author's trust
+  // from the votes they currently hold (#53)
 
   revalidatePath('/dictionary/[id]', 'page')
   if (wordId) {
@@ -226,9 +225,6 @@ export async function voteOnContribution(contributionId: string, wordId?: string
       console.error('Error voting on contribution:', error)
       throw new Error('Failed to vote on contribution')
     }
-
-    // Update trust score of contribution author
-    await updateTrustScoreForVote(user.id, 1, 'contribution')
   }
 
   revalidatePath('/dictionary/[id]', 'page')
@@ -236,60 +232,3 @@ export async function voteOnContribution(contributionId: string, wordId?: string
     revalidatePath(`/contribute?word=${wordId}`, 'page')
   }
 }
-
-// ============================================================================
-// HELPER FUNCTIONS
-// ============================================================================
-
-async function updateTrustScoreForVote(
-  userId: string,
-  voteType: 1 | -1,
-  targetType: 'comment' | 'contribution'
-) {
-  const supabase = await createServerComponentClient()
-
-  // Get voter's trust score for weighting
-  const { data: voter } = await supabase
-    .from('profiles')
-    .select('trust_score, connection_type')
-    .eq('id', userId)
-    .single()
-
-  if (!voter) return
-
-  // Calculate vote weight based on connection type and trust score
-  const typeWeights: Record<string, number> = {
-    native_speaker: 2.0,
-    heritage_speaker: 1.5,
-    second_language: 1.0,
-    learning_now: 0.5,
-    researcher: 1.0,
-    other: 0.5,
-  }
-  const typeWeight = typeWeights[voter.connection_type as string] || 1.0
-
-  const trustMultiplier = voter.trust_score >= 1.0 ? 1.0 :
-                         voter.trust_score >= 0.5 ? 0.75 :
-                         voter.trust_score >= 0.2 ? 0.25 : 0.1
-
-  const voteWeight = typeWeight * trustMultiplier
-
-  // Update target author's trust score
-  const scoreChange = voteType === 1 ? 0.1 * voteWeight : -0.2 * voteWeight
-
-  // Note: This would need to query the target to find the author
-  // For now, we'll implement this in a database trigger or separate function
-  // This is just a placeholder for the logic
-}
-
-// Note: Add this SQL function to your migration for automatic trust score updates
-/*
-CREATE OR REPLACE FUNCTION update_author_trust_score()
-RETURNS TRIGGER AS $$
-BEGIN
-  -- Implementation to update trust_score of contribution/comment author
-  -- based on vote_type and voter's trust_score
-  RETURN NULL;
-END;
-$$ LANGUAGE plpgsql;
-*/
