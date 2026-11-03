@@ -1,6 +1,7 @@
 import { getTotalWordCount } from '@/lib/supabase'
 import { requireActiveUser } from '@/lib/auth'
 import Link from 'next/link'
+import { TRUST_LEVEL_LABELS } from '@/lib/trust'
 
 export const dynamic = 'force-dynamic'
 
@@ -95,7 +96,8 @@ export default async function MyContributionsPage() {
 
         <div className="mt-6 pt-6 border-t">
           <div className="text-sm text-gray-600">
-            <strong>Trust Score:</strong> {profile.trust_score.toFixed(1)}x
+            <strong>{TRUST_LEVEL_LABELS[profile.trust_level]}</strong>
+            <span className="ml-4"><strong>Trust Score:</strong> {profile.trust_score.toFixed(1)}x</span>
             <span className="ml-4">
               <strong>Progress:</strong> {(totalWords > 0 ? (profile.contribution_count / totalWords) * 100 : 0).toFixed(1)}% of dictionary
             </span>

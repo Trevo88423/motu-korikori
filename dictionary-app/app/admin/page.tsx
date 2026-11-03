@@ -126,11 +126,12 @@ export default async function AdminPage({
     .order('updated_at', { ascending: false })
     .limit(20)
 
-  // Fetch low trust users
+  // Fetch low trust users: below a fresh New member (0.5), which only flags
+  // upheld against them or a restriction can do (#53)
   const { data: lowTrustUsers } = await supabase
     .from('profiles')
-    .select('id, display_name, connection_type, trust_score, contribution_count, status')
-    .lt('trust_score', 0.7)
+    .select('id, display_name, connection_type, trust_score, trust_level, contribution_count, status')
+    .lt('trust_score', 0.5)
     .order('trust_score', { ascending: true })
     .limit(20)
 
@@ -274,7 +275,10 @@ export default async function AdminPage({
 
           {moderationSettings && moderationSettings.length > 0 && (
             <details className="mt-6 border-t pt-4">
-              <summary className="text-sm font-medium text-gray-700 cursor-pointer">Flag settings</summary>
+              <summary className="text-sm font-medium text-gray-700 cursor-pointer">Trust and flag settings</summary>
+              <p className="mt-2 text-xs text-gray-500">
+                Saving a setting recomputes every member&apos;s trust and level straight away.
+              </p>
               <div className="mt-3 space-y-3">
                 {moderationSettings.map((setting: any) => (
                   <form key={setting.key} action={updateModerationSetting} className="flex flex-wrap items-end gap-2">
@@ -284,7 +288,7 @@ export default async function AdminPage({
                       <input
                         type="number"
                         name="value"
-                        step="0.05"
+                        step="any"
                         min="0"
                         defaultValue={setting.value}
                         className="input mt-1"
@@ -377,7 +381,7 @@ export default async function AdminPage({
                     <div>
                       <h3 className="font-bold text-gray-900">{user.display_name}</h3>
                       <p className="text-sm text-gray-600 mt-1">
-                        Trust Score: {user.trust_score.toFixed(2)} •
+                        Trust Score: {user.trust_score.toFixed(2)} ({user.trust_level.replace('_', ' ')}) •
                         Status: {user.status} •
                         Contributions: {user.contribution_count}
                       </p>

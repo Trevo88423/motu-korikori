@@ -7,6 +7,7 @@ import { requireActiveUserForAction, AccessDeniedError } from '@/lib/auth'
 import { calculateConsensus, recalculateAllConsensus } from '@/lib/consensus'
 import { sendEmail, escapeHtml } from '@/lib/email'
 import type { WordType } from '@/lib/types'
+import { TRUST_SETTING_KEYS } from '@/lib/trust'
 
 async function requireAdmin() {
   const { profile } = await requireActiveUserForAction({ requireAdmin: true })
@@ -555,10 +556,11 @@ export async function confirmHidden(formData: FormData) {
 
 const MODERATION_SETTING_KEYS = [
   'flag_hide_threshold',
+  'flag_weight_new',
   'flag_weight_member',
   'flag_weight_trusted',
-  'flag_trusted_min_trust',
   'flag_overturn_penalty',
+  ...TRUST_SETTING_KEYS,
 ]
 
 export async function updateModerationSetting(formData: FormData) {

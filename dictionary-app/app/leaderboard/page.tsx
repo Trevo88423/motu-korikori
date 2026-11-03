@@ -1,6 +1,7 @@
 import { createServerComponentClient } from '@/lib/supabase'
 import Link from 'next/link'
 import { SITE_NAME } from '@/lib/seo'
+import { TRUST_LEVEL_LABELS } from '@/lib/trust'
 import type { Metadata } from 'next'
 
 export const dynamic = 'force-dynamic'
@@ -22,7 +23,7 @@ export default async function LeaderboardPage() {
   // Get top contributors
   const { data: topContributors } = await supabase
     .from('profiles')
-    .select('id, display_name, contribution_count, connection_type, trust_score, status')
+    .select('id, display_name, contribution_count, connection_type, trust_score, trust_level, status')
     .gt('contribution_count', 0)
     .neq('status', 'banned')
     .order('contribution_count', { ascending: false })
@@ -143,6 +144,9 @@ export default async function LeaderboardPage() {
                       <span className={`inline-block px-2 py-1 text-xs rounded ${typeInfo.color}`}>
                         {typeInfo.label}
                       </span>
+                      {contributor.trust_level === 'trusted_speaker' && (
+                        <span className="ml-1 text-xs text-gray-500">{TRUST_LEVEL_LABELS.trusted_speaker}</span>
+                      )}
                     </td>
                     <td className="py-2 sm:py-3 px-2 sm:px-4 text-right font-medium text-gray-900 text-sm sm:text-base">
                       {contributor.contribution_count.toLocaleString()}
