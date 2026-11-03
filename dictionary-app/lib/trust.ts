@@ -3,7 +3,7 @@ import type { TrustLevel } from './types'
 /**
  * The trust ladder (#53). Levels and trust_score are recomputed in the
  * database from each member's record (recompute_trust() in
- * supabase/migrations/20261103075931_trust_ladder.sql); the app only reads them.
+ * supabase/migrations/20261103130000_trust_ladder.sql); the app only reads them.
  */
 export const TRUST_LEVEL_LABELS: Record<TrustLevel, string> = {
   new: 'New contributor',

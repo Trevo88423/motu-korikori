@@ -1,5 +1,5 @@
 -- =============================================================================
--- 20261103075931 — Trust recomputed from the record; the trust ladder
+-- 20261103130000 — Trust recomputed from the record; the trust ladder
 -- (#53, part of #51; fixes #44)
 --
 -- #44: update_author_trust_on_vote() added trust on every vote insert and never
@@ -32,8 +32,10 @@
 --                    member_min_matches translations matching consensus or record
 --                    score >= member_min_trust.
 --   new              everyone else, including every new signup.
--- is_established(uuid) is the one definition of "established" for visitor-facing
--- reads (#30, and the 2026-10-24 decision in docs/DECISIONS.md).
+-- is_established_contributor(uuid), added by #30 (20261103120000), stays the one
+-- definition of "established" for visitor-facing reads (the 2026-10-24 decision
+-- in docs/DECISIONS.md); this replaces its interim body with "Member or above".
+-- Needs 20261103120000 applied first (it's earlier, so db push orders it).
 --
 -- profiles.trust_score is what a member counts for: record score x the level's
 -- weight (trust_level_weight_<level>). New members count half, restricted zero.
@@ -299,9 +301,9 @@ REVOKE ALL ON FUNCTION public.recompute_all_trust() FROM PUBLIC, anon, authentic
 GRANT EXECUTE ON FUNCTION public.recompute_all_trust() TO service_role;
 
 -- The one definition of "established" (#53 decision, 2026-10-24): Member or
--- Trusted speaker. For RLS on visitor-facing reads (#30), so anon may call it;
--- it only says what profiles.trust_level already shows.
-CREATE OR REPLACE FUNCTION public.is_established(member uuid)
+-- Trusted speaker. Same signature and privileges as #30's interim version
+-- (20261103120000); contribution_is_public() calls it for visitor reads.
+CREATE OR REPLACE FUNCTION public.is_established_contributor(p_user uuid)
 RETURNS boolean
 LANGUAGE sql
 STABLE
@@ -309,12 +311,11 @@ SECURITY DEFINER
 SET search_path = ''
 AS $$
   SELECT coalesce(
-    (SELECT trust_level IN ('member', 'trusted_speaker') FROM public.profiles WHERE id = member),
+    (SELECT trust_level IN ('member', 'trusted_speaker') FROM public.profiles WHERE id = p_user),
     false)
 $$;
 
-REVOKE ALL ON FUNCTION public.is_established(uuid) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.is_established(uuid) TO anon, authenticated, service_role;
+REVOKE ALL ON FUNCTION public.is_established_contributor(uuid) FROM PUBLIC, anon, authenticated;
 
 -- --- Triggers ---------------------------------------------------------------------------
 
