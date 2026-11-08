@@ -4,6 +4,7 @@ import ContributeClient from '@/components/ContributeClient'
 import { saveContribution } from './actions'
 import { markWordComplete } from './completion-actions'
 import type { Word, Contribution, ContributionWithProfile } from '@/lib/types'
+import { getMyDailyLimits } from '@/lib/rate-limits'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0 // Disable caching completely
@@ -101,6 +102,7 @@ export default async function ContributePage({
     // All contributions for this word (for consensus display)
     { data: allContributions },
     { data: comments },
+    dailyLimits,
   ] = await Promise.all([
     supabase
       .from('contributions')
@@ -124,7 +126,11 @@ export default async function ContributePage({
       `)
       .eq('word_id', word.id)
       .order('net_votes', { ascending: false }),
+    getMyDailyLimits(supabase),
   ])
+
+  // Today's translation allowance (#55); admins have no limit
+  const translationsLeft = dailyLimits.translations?.remaining ?? null
 
   // The user's votes on those comments, in one query
   const commentIds = (comments || []).map((c) => c.id)
@@ -158,6 +164,13 @@ export default async function ContributePage({
             style={{ width: `${totalWords > 0 ? (profile.contribution_count / totalWords) * 100 : 0}%` }}
           />
         </div>
+        {translationsLeft !== null && (
+          <p className="text-sm text-gray-600 mt-2">
+            {translationsLeft > 0
+              ? `You can add ${translationsLeft} more ${translationsLeft === 1 ? 'translation' : 'translations'} today.`
+              : "You've reached today's limit for translations. You can carry on tomorrow."}
+          </p>
+        )}
       </div>
 
       <ContributeClient

@@ -3,6 +3,7 @@
 import { requireActiveUserForAction } from '@/lib/auth'
 import { calculateConsensus } from '@/lib/consensus'
 import { FLAG_REASONS, type FlagKind, type FlagReason } from '@/lib/flags'
+import { isRateLimitError, rateLimitMessage } from '@/lib/rate-limits'
 
 interface FlagResult {
   status: 'flagged' | 'already_flagged'
@@ -13,7 +14,13 @@ interface FlagResult {
 
 // Flags a translation or comment. flag_content() refuses anon, inactive
 // members, unknown reasons and the caller's own items, and decides the hide.
-export async function flagContent(kind: FlagKind, targetId: string, reason: FlagReason) {
+// A daily-limit refusal comes back as { error }, since thrown messages are
+// hidden in production builds.
+export async function flagContent(
+  kind: FlagKind,
+  targetId: string,
+  reason: FlagReason
+): Promise<{ alreadyFlagged?: boolean; error?: string }> {
   const { supabase } = await requireActiveUserForAction()
 
   if (!FLAG_REASONS[kind]?.some((r) => r.value === reason)) {
@@ -26,6 +33,7 @@ export async function flagContent(kind: FlagKind, targetId: string, reason: Flag
     reason,
   })
 
+  if (error && isRateLimitError(error)) return { error: rateLimitMessage(error, 'flags') }
   if (error) {
     console.error('Error flagging content:', error)
     if (error.message.includes('your own')) {

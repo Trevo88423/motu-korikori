@@ -9,6 +9,7 @@ import {
   isBlockedLanguageError,
   logBlockedLanguageAttempt,
 } from '@/lib/blocked-language'
+import { isRateLimitError, rateLimitMessage } from '@/lib/rate-limits'
 
 // calculateConsensus() writes with the service-role client. Each action below
 // only calls it after the signed-in member's own contribution write (checked by
@@ -68,6 +69,7 @@ export async function agreeWithTranslation(wordId: string, englishGloss: string)
       await logBlockedLanguageAttempt(supabase, 'contributions', englishGloss)
       return { error: BLOCKED_LANGUAGE_MESSAGE }
     }
+    if (error && isRateLimitError(error)) return { error: rateLimitMessage(error, 'translations') }
     if (error) {
       console.error('Error updating agreement:', error)
       throw new Error('Failed to update agreement')
@@ -88,6 +90,7 @@ export async function agreeWithTranslation(wordId: string, englishGloss: string)
       await logBlockedLanguageAttempt(supabase, 'contributions', englishGloss)
       return { error: BLOCKED_LANGUAGE_MESSAGE }
     }
+    if (error && isRateLimitError(error)) return { error: rateLimitMessage(error, 'translations') }
     if (error) {
       console.error('Error adding agreement:', error)
       throw new Error('Failed to add agreement')
@@ -136,6 +139,7 @@ export async function saveContribution(data: ContributionFormData): Promise<Cont
     await logBlockedLanguageAttempt(supabase, 'contributions', `${data.english_gloss} ${data.notes ?? ''}`)
     return { error: BLOCKED_LANGUAGE_MESSAGE }
   }
+  if (error && isRateLimitError(error)) return { error: rateLimitMessage(error, 'translations') }
   if (error) {
     console.error('Error saving contribution:', error)
     throw new Error('Failed to save contribution')
