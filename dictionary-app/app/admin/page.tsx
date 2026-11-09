@@ -113,6 +113,9 @@ export default async function AdminPage({
         .order('key'),
     ])
 
+  const trustSettings = (moderationSettings || []).filter((s: any) => !s.key.startsWith('rate_'))
+  const rateLimitSettings = (moderationSettings || []).filter((s: any) => s.key.startsWith('rate_'))
+
   const hiddenItems = [
     ...(hiddenContributions || []).map((c: any) => ({ ...c, kind: 'contribution' as const, text: c.english_gloss })),
     ...(hiddenComments || []).map((c: any) => ({ ...c, kind: 'comment' as const, text: c.comment_text })),
@@ -273,31 +276,24 @@ export default async function AdminPage({
             <p className="text-gray-500 text-center py-8">Nothing hidden by flags</p>
           )}
 
-          {moderationSettings && moderationSettings.length > 0 && (
+          {trustSettings.length > 0 && (
             <details className="mt-6 border-t pt-4">
               <summary className="text-sm font-medium text-gray-700 cursor-pointer">Trust and flag settings</summary>
               <p className="mt-2 text-xs text-gray-500">
                 Saving a setting recomputes every member&apos;s trust and level straight away.
               </p>
-              <div className="mt-3 space-y-3">
-                {moderationSettings.map((setting: any) => (
-                  <form key={setting.key} action={updateModerationSetting} className="flex flex-wrap items-end gap-2">
-                    <input type="hidden" name="key" value={setting.key} />
-                    <label className="flex-1 min-w-[12rem] text-sm text-gray-700">
-                      {setting.description}
-                      <input
-                        type="number"
-                        name="value"
-                        step="any"
-                        min="0"
-                        defaultValue={setting.value}
-                        className="input mt-1"
-                      />
-                    </label>
-                    <button type="submit" className="btn btn-ghost text-sm">Save</button>
-                  </form>
-                ))}
-              </div>
+              <SettingsForms settings={trustSettings} step="any" />
+            </details>
+          )}
+
+          {rateLimitSettings.length > 0 && (
+            <details className="mt-4 border-t pt-4">
+              <summary className="text-sm font-medium text-gray-700 cursor-pointer">Daily limits per member</summary>
+              <p className="mt-2 text-xs text-gray-500">
+                How many of each a member can add in one day (Port Moresby time), by trust level. A
+                change applies straight away. 0 switches that action off for the level.
+              </p>
+              <SettingsForms settings={rateLimitSettings} step="1" />
             </details>
           )}
         </div>
@@ -584,6 +580,36 @@ export default async function AdminPage({
           )}
         </div>
       </div>
+    </div>
+  )
+}
+
+interface ModerationSetting {
+  key: string
+  value: number
+  description: string
+}
+
+function SettingsForms({ settings, step }: { settings: ModerationSetting[]; step: string }) {
+  return (
+    <div className="mt-3 space-y-3">
+      {settings.map((setting) => (
+        <form key={setting.key} action={updateModerationSetting} className="flex flex-wrap items-end gap-2">
+          <input type="hidden" name="key" value={setting.key} />
+          <label className="flex-1 min-w-[12rem] text-sm text-gray-700">
+            {setting.description}
+            <input
+              type="number"
+              name="value"
+              step={step}
+              min="0"
+              defaultValue={setting.value}
+              className="input mt-1"
+            />
+          </label>
+          <button type="submit" className="btn btn-ghost text-sm">Save</button>
+        </form>
+      ))}
     </div>
   )
 }

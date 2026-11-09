@@ -45,8 +45,9 @@ export default function FlagButton({ kind, targetId }: FlagButtonProps) {
     setSending(true)
     setError('')
     try {
-      const { alreadyFlagged } = await flagContent(kind, targetId, reason)
-      setDone(alreadyFlagged ? 'already' : 'thanks')
+      const result = await flagContent(kind, targetId, reason)
+      if (result.error) setError(result.error)
+      else setDone(result.alreadyFlagged ? 'already' : 'thanks')
     } catch (err: any) {
       setError(err.message || 'Could not send the flag')
     } finally {

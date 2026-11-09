@@ -8,6 +8,7 @@ import {
   isBlockedLanguageError,
   logBlockedLanguageAttempt,
 } from '@/lib/blocked-language'
+import { isRateLimitError, rateLimitMessage } from '@/lib/rate-limits'
 
 // ============================================================================
 // COMMENT ACTIONS
@@ -34,6 +35,7 @@ export async function addComment(data: CommentFormData): Promise<{ error?: strin
     await logBlockedLanguageAttempt(supabase, 'comments', data.comment_text)
     return { error: BLOCKED_LANGUAGE_MESSAGE }
   }
+  if (error && isRateLimitError(error)) return { error: rateLimitMessage(error, 'comments') }
   if (error) {
     if (error.code === '23505') { // Unique constraint violation
       throw new Error('You have already commented on this word. You can edit your existing comment.')
@@ -67,6 +69,7 @@ export async function updateComment(commentId: string, commentText: string, word
     await logBlockedLanguageAttempt(supabase, 'comments', commentText)
     return { error: BLOCKED_LANGUAGE_MESSAGE }
   }
+  if (error && isRateLimitError(error)) return { error: rateLimitMessage(error, 'comments') }
   if (error) {
     console.error('Error updating comment:', error)
     throw new Error('Failed to update comment')
@@ -104,7 +107,7 @@ export async function deleteComment(commentId: string, wordId?: string) {
 // VOTING ACTIONS
 // ============================================================================
 
-export async function voteOnComment(action: VoteAction, wordId?: string) {
+export async function voteOnComment(action: VoteAction, wordId?: string): Promise<{ error?: string }> {
   const { supabase, user } = await requireActiveUserForAction()
 
   if (!action.vote_type || (action.vote_type !== 1 && action.vote_type !== -1)) {
@@ -137,6 +140,7 @@ export async function voteOnComment(action: VoteAction, wordId?: string) {
         .update({ vote_type: action.vote_type })
         .eq('id', existingVote.id)
 
+      if (error && isRateLimitError(error)) return { error: rateLimitMessage(error, 'votes') }
       if (error) {
         throw new Error('Failed to update vote')
       }
@@ -151,6 +155,7 @@ export async function voteOnComment(action: VoteAction, wordId?: string) {
         vote_type: action.vote_type,
       })
 
+    if (error && isRateLimitError(error)) return { error: rateLimitMessage(error, 'votes') }
     if (error) {
       if (error.message.includes('violates row-level security')) {
         throw new Error('You cannot vote on your own comment')
@@ -167,9 +172,10 @@ export async function voteOnComment(action: VoteAction, wordId?: string) {
   if (wordId) {
     revalidatePath(`/contribute?word=${wordId}`, 'page')
   }
+  return {}
 }
 
-export async function voteOnContribution(contributionId: string, wordId?: string) {
+export async function voteOnContribution(contributionId: string, wordId?: string): Promise<{ error?: string }> {
   const { supabase, user } = await requireActiveUserForAction()
 
   // Check if user has already submitted a translation for this word
@@ -221,6 +227,7 @@ export async function voteOnContribution(contributionId: string, wordId?: string
         user_id: user.id,
       })
 
+    if (error && isRateLimitError(error)) return { error: rateLimitMessage(error, 'votes') }
     if (error) {
       console.error('Error voting on contribution:', error)
       throw new Error('Failed to vote on contribution')
@@ -231,4 +238,5 @@ export async function voteOnContribution(contributionId: string, wordId?: string
   if (wordId) {
     revalidatePath(`/contribute?word=${wordId}`, 'page')
   }
+  return {}
 }

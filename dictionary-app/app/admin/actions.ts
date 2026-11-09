@@ -8,6 +8,7 @@ import { calculateConsensus, recalculateAllConsensus } from '@/lib/consensus'
 import { sendEmail, escapeHtml } from '@/lib/email'
 import type { WordType } from '@/lib/types'
 import { TRUST_SETTING_KEYS } from '@/lib/trust'
+import { RATE_LIMIT_MAX, RATE_LIMIT_SETTING_KEYS } from '@/lib/rate-limits'
 
 async function requireAdmin() {
   const { profile } = await requireActiveUserForAction({ requireAdmin: true })
@@ -561,6 +562,7 @@ const MODERATION_SETTING_KEYS = [
   'flag_weight_trusted',
   'flag_overturn_penalty',
   ...TRUST_SETTING_KEYS,
+  ...RATE_LIMIT_SETTING_KEYS,
 ]
 
 export async function updateModerationSetting(formData: FormData) {
@@ -568,7 +570,12 @@ export async function updateModerationSetting(formData: FormData) {
   const key = formData.get('key') as string
   const value = Number(formData.get('value'))
 
-  if (!MODERATION_SETTING_KEYS.includes(key) || !Number.isFinite(value) || value < 0 || value > 100) {
+  if (!MODERATION_SETTING_KEYS.includes(key) || !Number.isFinite(value) || value < 0) {
+    throw new Error('Invalid setting')
+  }
+  // Daily limits are whole numbers of writes; the rest are weights and thresholds
+  const isRateLimit = RATE_LIMIT_SETTING_KEYS.includes(key)
+  if (isRateLimit ? !Number.isInteger(value) || value > RATE_LIMIT_MAX : value > 100) {
     throw new Error('Invalid setting')
   }
 

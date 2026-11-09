@@ -17,6 +17,7 @@ export default function CommentSection({ wordId, comments, userComment, currentU
   const [isEditing, setIsEditing] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
+  const [voteError, setVoteError] = useState('')
   const [showLowScored, setShowLowScored] = useState(false)
   const [showGuidelines, setShowGuidelines] = useState(false)
 
@@ -67,10 +68,12 @@ export default function CommentSection({ wordId, comments, userComment, currentU
   }
 
   const handleVote = async (commentId: string, voteType: 1 | -1) => {
+    setVoteError('')
     try {
-      await voteOnComment({ target_id: commentId, vote_type: voteType }, wordId)
+      const result = await voteOnComment({ target_id: commentId, vote_type: voteType }, wordId)
+      if (result.error) setVoteError(result.error)
     } catch (err: any) {
-      setError(err.message || 'Failed to vote')
+      setVoteError(err.message || 'Failed to vote')
     }
   }
 
@@ -208,6 +211,12 @@ export default function CommentSection({ wordId, comments, userComment, currentU
             </div>
           </form>
         </div>
+      )}
+
+      {voteError && (
+        <p role="alert" className="p-2 bg-red-50 border border-red-200 rounded text-sm text-red-600">
+          {voteError}
+        </p>
       )}
 
       {/* Display comments */}
